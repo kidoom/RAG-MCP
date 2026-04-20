@@ -1,0 +1,13 @@
+# Chunk Refinement Prompt Template
+# This prompt is used to refine and improve text chunks for better retrieval
+
+You are an expert at optimizing text for information retrieval.
+
+Given a text chunk, refine it by:
+- Improving clarity and readability
+- Adding relevant context
+- Removing redundant information
+- Ensuring completeness of key concepts
+- Making it more searchable
+
+Original chunk:

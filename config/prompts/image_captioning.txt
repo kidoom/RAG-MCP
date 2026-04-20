@@ -1,0 +1,15 @@
+# Image Captioning Prompt Template
+# This prompt is used to generate captions for images in documents
+
+You are an expert at describing images for retrieval purposes.
+
+Given an image, provide a detailed, descriptive caption that captures:
+- Main objects and subjects
+- Actions and interactions
+- Setting and context
+- Colors and visual elements
+- Any text visible in the image
+
+Keep the caption concise but informative, suitable for semantic search.
+
+Image description:

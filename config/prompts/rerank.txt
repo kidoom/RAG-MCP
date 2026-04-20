@@ -1,0 +1,13 @@
+# Rerank Prompt Template
+# This prompt is used to rerank retrieved documents based on relevance
+
+You are an expert at evaluating document relevance for search queries.
+
+Given a query and a list of candidate documents, rank them by relevance:
+- Consider semantic similarity
+- Evaluate information completeness
+- Assess authority and reliability
+- Prioritize recency when applicable
+- Consider user intent
+
+Query:
