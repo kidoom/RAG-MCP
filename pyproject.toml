@@ -39,3 +39,21 @@ where = ["src"]
 
 [tool.setuptools.package-dir]
 "" = "src"
+
+[tool.pytest.ini_options]
+# Pytest configuration for Modular RAG MCP Server
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --strict-markers --tb=short"
+markers = [
+    "unit: Unit tests (isolated components)",
+    "integration: Integration tests (multi-component)",
+    "e2e: End-to-end tests (full workflows)",
+    "slow: Slow tests (e.g., real API calls)",
+]
+asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
