@@ -1,12 +1,15 @@
 import base64
-from typing import List
+import os
+from typing import List, Optional, Union
 from openai import OpenAI
-from . import BaseVisionLLM, VisionLLMSettings
+from ..base_vision_llm import BaseVisionLLM, VisionLLMSettings
 
 
-def encode_image(image_path: str) -> str:
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
+def encode_image(image_path_or_bytes: Union[str, bytes]) -> str:
+    if isinstance(image_path_or_bytes, str):
+        with open(image_path_or_bytes, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+    return base64.b64encode(image_path_or_bytes).decode('utf-8')
 
 
 class OllamaVisionLLM(BaseVisionLLM):
@@ -18,25 +21,34 @@ class OllamaVisionLLM(BaseVisionLLM):
         )
 
     def describe_image(self, image_path: str, prompt: str = None) -> str:
-        base64_image = encode_image(image_path)
+        return self.chat_with_image(prompt or "Describe this image in detail.", image_path)
+
+    def chat_with_image(
+        self,
+        text: str,
+        image_path: Optional[Union[str, bytes]] = None,
+        **kwargs
+    ) -> str:
+        content = [{"type": "text", "text": text}]
+        
+        if image_path:
+            base64_image = encode_image(image_path)
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+            })
+            
         messages = [
             {
                 "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt or "Describe this image in detail."},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
-                    }
-                ]
+                "content": content
             }
         ]
+        
         response = self.client.chat.completions.create(
             model=self.settings.model,
             messages=messages,
-            max_tokens=500
+            max_tokens=kwargs.get("max_tokens", 500),
+            **{k: v for k, v in kwargs.items() if k != "max_tokens"}
         )
         return response.choices[0].message.content
-
-    def describe_images(self, image_paths: List[str], prompt: str = None) -> List[str]:
-        return [self.describe_image(path, prompt) for path in image_paths]

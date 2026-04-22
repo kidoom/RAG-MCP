@@ -1,6 +1,6 @@
 from typing import Dict, Any, List
 from openai import AzureOpenAI
-from . import BaseLLM, LLMSettings
+from .base_llm import BaseLLM, LLMSettings
 
 
 class AzureLLM(BaseLLM):
@@ -22,7 +22,7 @@ class AzureLLM(BaseLLM):
         )
         return response.choices[0].message.content
 
-    def generate_with_messages(self, messages: List[Dict[str, str]], **kwargs) -> str:
+    def chat(self, messages: List[Dict[str, str]], **kwargs) -> str:
         response = self.client.chat.completions.create(
             model=self.settings.deployment_name,
             messages=messages,

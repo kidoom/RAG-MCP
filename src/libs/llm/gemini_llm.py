@@ -1,5 +1,5 @@
 from .openai_llm import OpenAILLM
-from . import LLMSettings
+from .base_llm import LLMSettings
 
 
 class GeminiLLM(OpenAILLM):

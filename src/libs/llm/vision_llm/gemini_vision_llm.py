@@ -1,5 +1,5 @@
 from .openai_vision_llm import OpenAIVisionLLM
-from . import VisionLLMSettings
+from ..base_vision_llm import VisionLLMSettings
 
 
 class GeminiVisionLLM(OpenAIVisionLLM):
