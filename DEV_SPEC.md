@@ -1983,7 +1983,7 @@ dashboard:
 |---------|---------|------|---------|------|
 | C1 | 定义核心数据类型/契约（Document/Chunk/ChunkRecord） | [x] | 2026-04-23 | types.py 契约、校验与 test_core_types 通过 |
 | C2 | 文件完整性检查（SHA256） | [x] | 2026-04-23 | SQLiteIntegrityChecker（WAL）+ SHA256 + 并发写入测试通过 |
-| C3 | Loader 抽象基类与 PDF Loader | [ ] | | |
+| C3 | Loader 抽象基类与 PDF Loader | [x] | 2026-04-23 | BaseLoader/PdfLoader（文本+图片占位符+降级）与契约测试通过 |
 | C4 | Splitter 集成（调用 Libs） | [ ] | | |
 | C5 | Transform 基类 + ChunkRefiner | [ ] | | |
 | C6 | MetadataEnricher | [ ] | | |
