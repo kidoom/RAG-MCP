@@ -8,12 +8,14 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..llm.base_llm import BaseLLM
-from .base_reranker import BaseReranker, RerankerSettings
+from .base_reranker import (
+    BaseReranker,
+    RERANK_FALLBACK_KEY,
+    RERANK_FALLBACK_REASON_KEY,
+    RerankerSettings,
+)
 
 _DEFAULT_PROMPT_PATH = Path(__file__).resolve().parents[3] / "config" / "prompts" / "rerank.txt"
-
-RERANK_FALLBACK_KEY = "_rerank_fallback"
-RERANK_FALLBACK_REASON_KEY = "_rerank_fallback_reason"
 
 
 def _strip_hash_comments(text: str) -> str:

@@ -3,6 +3,7 @@ import pytest
 from src.libs.llm.base_llm import BaseLLM, LLMSettings
 from src.libs.reranker import (
     BaseReranker,
+    CrossEncoderReranker,
     LLMReranker,
     NoneReranker,
     RerankerFactory,
@@ -59,6 +60,7 @@ class TestRerankerFactory:
 
         assert "none" in providers
         assert "llm" in providers
+        assert "cross_encoder" in providers
         assert providers == sorted(providers)
 
     def test_create_llm_reranker(self):
@@ -68,6 +70,18 @@ class TestRerankerFactory:
         )
         reranker = RerankerFactory.create(settings)
         assert isinstance(reranker, LLMReranker)
+
+    def test_create_cross_encoder_reranker(self):
+        class _Scorer:
+            def predict(self, pairs):
+                return [1.0] * len(pairs)
+
+        settings = RerankerSettings(
+            backend="cross_encoder",
+            extra={"cross_encoder_scorer": _Scorer()},
+        )
+        reranker = RerankerFactory.create(settings)
+        assert isinstance(reranker, CrossEncoderReranker)
 
 
 class TestNoneRerankerBehavior:

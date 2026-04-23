@@ -1972,7 +1972,7 @@ dashboard:
 | B7.5 | Recursive Splitter 默认实现 | [x] | 2026-04-22 | 已完成接口对齐 |
 | B7.6 | ChromaStore 默认实现 | [x] | 2026-04-23 | ChromaStore 实现与 upsert-query roundtrip 集成测试通过 |
 | B7.7 | LLM Reranker 实现 | [x] | 2026-04-23 | LLMReranker、rerank.txt 模板、结构化 ranked_ids 校验与 LLM 失败回退信号 |
-| B7.8 | Cross-Encoder Reranker 实现 | [ ] | | |
+| B7.8 | Cross-Encoder Reranker 实现 | [x] | 2026-04-23 | CrossEncoderReranker、mock scorer 单测、超时/失败回退与工厂注册 |
 | B7.9 | HuggingFace/BGE Embedding 实现 | [x] | 2026-04-22 | 已完成接口对齐 |
 | B8 | Vision LLM 抽象接口与工厂集成 | [x] | 2026-04-22 | 已集成至 LLMFactory |
 | B9 | Azure Vision LLM 实现 | [x] | 2026-04-22 | 包含 OpenAI/Ollama/Qwen/Gemini 实现 |

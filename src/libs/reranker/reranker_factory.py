@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Dict, Type
 
 from .base_reranker import BaseReranker, NoneReranker, RerankerSettings
+from .cross_encoder_reranker import CrossEncoderReranker
 from .llm_reranker import LLMReranker
 
 
@@ -27,10 +28,13 @@ class RerankerFactory:
                 )
             return LLMReranker(settings, llm)
 
+        if backend_name == "cross_encoder":
+            return CrossEncoderReranker(settings)
+
         provider_cls = cls._providers.get(backend_name)
 
         if not provider_cls:
-            available = ", ".join(sorted(cls._providers.keys())) or "none"
+            available = ", ".join(cls.list_providers()) or "none"
             raise ValueError(
                 f"Unsupported reranker backend: {backend_name}. "
                 f"Available backends: {available}"
@@ -46,4 +50,4 @@ class RerankerFactory:
     @classmethod
     def list_providers(cls) -> list[str]:
         """List all available reranker providers."""
-        return sorted(set(cls._providers.keys()) | {"llm"})
+        return sorted(set(cls._providers.keys()) | {"llm", "cross_encoder"})

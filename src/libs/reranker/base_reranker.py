@@ -6,6 +6,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+RERANK_FALLBACK_KEY = "_rerank_fallback"
+RERANK_FALLBACK_REASON_KEY = "_rerank_fallback_reason"
+
 
 @dataclass
 class RerankerSettings:
