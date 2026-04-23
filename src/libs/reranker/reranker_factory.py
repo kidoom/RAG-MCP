@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Dict, Type
 
 from .base_reranker import BaseReranker, NoneReranker, RerankerSettings
+from .llm_reranker import LLMReranker
 
 
 class RerankerFactory:
@@ -18,6 +19,14 @@ class RerankerFactory:
     def create(cls, settings: RerankerSettings) -> BaseReranker:
         """Create a reranker instance based on configured backend."""
         backend_name = settings.backend.lower()
+        if backend_name == "llm":
+            llm = settings.extra.get("llm")
+            if llm is None:
+                raise ValueError(
+                    "Reranker backend 'llm' requires a BaseLLM instance in settings.extra['llm']"
+                )
+            return LLMReranker(settings, llm)
+
         provider_cls = cls._providers.get(backend_name)
 
         if not provider_cls:
@@ -37,4 +46,4 @@ class RerankerFactory:
     @classmethod
     def list_providers(cls) -> list[str]:
         """List all available reranker providers."""
-        return sorted(cls._providers.keys())
+        return sorted(set(cls._providers.keys()) | {"llm"})

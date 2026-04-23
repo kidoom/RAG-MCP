@@ -1960,19 +1960,20 @@ dashboard:
 | 任务编号 | 任务名称 | 状态 | 完成日期 | 备注 |
 |---------|---------|------|---------|------|
 | B1 | LLM 抽象接口与工厂 | [x] | 2026-04-22 | 接口定义、工厂实现、Provider 更新已完成 |
-| B2 | Embedding 抽象接口与工厂 | [x] | 2026-04-22 | EmbeddingFactory 实现、5个Provider 支持、13个测试通过 |
+| B2 | Embedding 抽象接口与工厂 | [x] | 2026-04-22 | EmbeddingFactory 实现、7个Provider 支持、验证通过 |
 | B3 | Splitter 抽象接口与工厂 | [x] | 2026-04-22 | SplitterFactory 实现、RecursiveCharacterSplitter、24个测试通过 |
-| B4 | VectorStore 抽象接口与工厂 | [ ] | | |
-| B5 | Reranker 抽象接口与工厂（含 None 回退） | [ ] | | |
-| B6 | Evaluator 抽象接口与工厂 | [ ] | | |
+| B4 | VectorStore 抽象接口与工厂 | [x] | 2026-04-23 | 抽象契约与工厂实现、7个单元测试通过 |
+| B5 | Reranker 抽象接口与工厂（含 None 回退） | [x] | 2026-04-23 | BaseReranker、NoneReranker、RerankerFactory 与 7 个测试已完成 |
+| B6 | Evaluator 抽象接口与工厂 | [x] | 2026-04-23 | BaseEvaluator、EvaluatorFactory、CustomEvaluator 与 9 个测试已完成 |
 | B7.1 | OpenAI-Compatible LLM 实现 | [x] | 2026-04-22 | 已完成接口对齐 |
 | B7.2 | Ollama LLM 实现 | [x] | 2026-04-22 | 已完成接口对齐 |
-| B7.3 | OpenAI & Azure Embedding 实现 | [ ] | | |
-| B7.4 | Ollama Embedding 实现 | [ ] | | |
-| B7.5 | Recursive Splitter 默认实现 | [ ] | | |
-| B7.6 | ChromaStore 默认实现 | [ ] | | |
-| B7.7 | LLM Reranker 实现 | [ ] | | |
+| B7.3 | OpenAI & Azure Embedding 实现 | [x] | 2026-04-22 | 已完成接口对齐 |
+| B7.4 | Ollama Embedding 实现 | [x] | 2026-04-22 | 已完成接口对齐 |
+| B7.5 | Recursive Splitter 默认实现 | [x] | 2026-04-22 | 已完成接口对齐 |
+| B7.6 | ChromaStore 默认实现 | [x] | 2026-04-23 | ChromaStore 实现与 upsert-query roundtrip 集成测试通过 |
+| B7.7 | LLM Reranker 实现 | [x] | 2026-04-23 | LLMReranker、rerank.txt 模板、结构化 ranked_ids 校验与 LLM 失败回退信号 |
 | B7.8 | Cross-Encoder Reranker 实现 | [ ] | | |
+| B7.9 | HuggingFace/BGE Embedding 实现 | [x] | 2026-04-22 | 已完成接口对齐 |
 | B8 | Vision LLM 抽象接口与工厂集成 | [x] | 2026-04-22 | 已集成至 LLMFactory |
 | B9 | Azure Vision LLM 实现 | [x] | 2026-04-22 | 包含 OpenAI/Ollama/Qwen/Gemini 实现 |
 
@@ -2066,8 +2067,8 @@ dashboard:
 
 | 阶段 | 总任务数 | 已完成 | 进度 |
 |------|---------|--------|------|
-| 阶段 A | 3 | 0 | 0% |
-| 阶段 B | 16 | 0 | 0% |
+| 阶段 A | 3 | 3 | 100% |
+| 阶段 B | 16 | 12 | 75% |
 | 阶段 C | 15 | 0 | 0% |
 | 阶段 D | 7 | 0 | 0% |
 | 阶段 E | 6 | 0 | 0% |
@@ -2075,7 +2076,7 @@ dashboard:
 | 阶段 G | 6 | 0 | 0% |
 | 阶段 H | 5 | 0 | 0% |
 | 阶段 I | 5 | 0 | 0% |
-| **总计** | **68** | **0** | **0%** |
+| **总计** | **68** | **15** | **22%** |
 
 
 ---

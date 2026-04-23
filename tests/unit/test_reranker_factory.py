@@ -1,7 +1,9 @@
 import pytest
 
+from src.libs.llm.base_llm import BaseLLM, LLMSettings
 from src.libs.reranker import (
     BaseReranker,
+    LLMReranker,
     NoneReranker,
     RerankerFactory,
     RerankerSettings,
@@ -11,6 +13,17 @@ from src.libs.reranker import (
 class FakeReranker(BaseReranker):
     def rerank(self, query: str, candidates: list[dict], trace=None) -> list[dict]:
         return sorted(candidates, key=lambda item: item.get("score", 0.0), reverse=True)
+
+
+class StubLLM(BaseLLM):
+    def __init__(self) -> None:
+        super().__init__(LLMSettings(provider="stub", model="stub"))
+
+    def generate(self, prompt: str, **kwargs) -> str:
+        return '{"ranked_ids": []}'
+
+    def chat(self, messages, **kwargs) -> str:
+        raise NotImplementedError
 
 
 class TestRerankerFactory:
@@ -45,7 +58,16 @@ class TestRerankerFactory:
         providers = RerankerFactory.list_providers()
 
         assert "none" in providers
+        assert "llm" in providers
         assert providers == sorted(providers)
+
+    def test_create_llm_reranker(self):
+        settings = RerankerSettings(
+            backend="llm",
+            extra={"llm": StubLLM(), "rerank_prompt_template": "Query:"},
+        )
+        reranker = RerankerFactory.create(settings)
+        assert isinstance(reranker, LLMReranker)
 
 
 class TestNoneRerankerBehavior:

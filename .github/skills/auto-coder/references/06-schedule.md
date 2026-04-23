@@ -51,7 +51,7 @@
 |---------|---------|------|---------|------|
 | B1 | LLM 抽象接口与工厂 | [x] | 2026-04-22 | 接口定义、工厂实现、Provider 更新已完成 |
 | B2 | Embedding 抽象接口与工厂 | [x] | 2026-04-22 | EmbeddingFactory 实现、5个Provider 支持、13个测试通过 |
-| B3 | Splitter 抽象接口与工厂 | [ ] | | |
+| B3 | Splitter 抽象接口与工厂 | [x] | 2026-04-22 | SplitterFactory 实现、RecursiveCharacterSplitter、24个测试通过 |
 | B4 | VectorStore 抽象接口与工厂 | [ ] | | |
 | B5 | Reranker 抽象接口与工厂（含 None 回退） | [ ] | | |
 | B6 | Evaluator 抽象接口与工厂 | [ ] | | |
