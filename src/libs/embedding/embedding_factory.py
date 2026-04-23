@@ -5,6 +5,7 @@ from .azure_embedding import AzureEmbedding
 from .ollama_embedding import OllamaEmbedding
 from .qwen_embedding import QwenEmbedding
 from .gemini_embedding import GeminiEmbedding
+from .huggingface_embedding import HuggingFaceEmbedding
 
 
 class EmbeddingFactory:
@@ -16,6 +17,8 @@ class EmbeddingFactory:
         "ollama": OllamaEmbedding,
         "qwen": QwenEmbedding,
         "gemini": GeminiEmbedding,
+        "huggingface": HuggingFaceEmbedding,
+        "bge": HuggingFaceEmbedding,  # Alias for BGE
     }
 
     @classmethod

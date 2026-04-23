@@ -13,6 +13,7 @@ class EmbeddingSettings:
     azure_endpoint: Optional[str] = None
     deployment_name: Optional[str] = None
     api_version: Optional[str] = None
+    device: Optional[str] = None
 
 
 class BaseEmbedding(ABC):
@@ -52,6 +53,7 @@ from .azure_embedding import AzureEmbedding
 from .ollama_embedding import OllamaEmbedding
 from .qwen_embedding import QwenEmbedding
 from .gemini_embedding import GeminiEmbedding
+from .huggingface_embedding import HuggingFaceEmbedding
 from .embedding_factory import EmbeddingFactory
 
 __all__ = [
@@ -63,4 +65,5 @@ __all__ = [
     "OllamaEmbedding",
     "QwenEmbedding",
     "GeminiEmbedding",
+    "HuggingFaceEmbedding",
 ]

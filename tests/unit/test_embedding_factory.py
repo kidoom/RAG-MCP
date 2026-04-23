@@ -53,6 +53,20 @@ class TestEmbeddingFactory:
         assert isinstance(embedding, OllamaEmbedding)
         assert embedding.settings.model == "nomic-embed-text"
 
+    def test_factory_create_huggingface_embedding(self):
+        """Test creating HuggingFace embedding instance."""
+        from src.libs.embedding import HuggingFaceEmbedding
+        settings = EmbeddingSettings(
+            provider="huggingface",
+            model="all-MiniLM-L6-v2",
+            dimensions=384
+        )
+        # Mock SentenceTransformer to avoid downloading model during test
+        with patch("src.libs.embedding.huggingface_embedding.SentenceTransformer") as mock_st:
+            embedding = EmbeddingFactory.create(settings)
+            assert isinstance(embedding, HuggingFaceEmbedding)
+            assert embedding.settings.model == "all-MiniLM-L6-v2"
+
     def test_factory_create_with_case_insensitive_provider(self):
         """Test that provider names are case-insensitive."""
         settings = EmbeddingSettings(
