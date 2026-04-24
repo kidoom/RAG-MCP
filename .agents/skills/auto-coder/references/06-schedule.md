@@ -79,9 +79,9 @@
 | C6 | MetadataEnricher | [x] | 2026-04-24 | MetadataEnricher、metadata_enrichment prompt、Settings.metadata_enricher、test_metadata_enricher_contract、集成需 METADATA_ENRICHER_LLM_INTEGRATION=1 |
 | C7 | ImageCaptioner | [x] | 2026-04-24 | ImageCaptioner、image_captioning prompt fallback、test_image_captioner_fallback 6/6 |
 | C8 | DenseEncoder | [x] | 2026-04-24 | DenseEncoder、ingestion.embedding 模块、test_dense_encoder 7/7 |
-| C9 | SparseEncoder | [x] | 2026-04-24 | SparseEncoder（BM25 term stats）、test_sparse_encoder 6/6 |
-| C10 | BatchProcessor | [x] | 2026-04-24 | BatchProcessor（dense+sparse 批处理编排）、test_batch_processor 7/7 |
-| C11 | BM25Indexer（倒排索引+IDF计算） | [x] | 2026-04-24 | BM25Indexer（build/load/query + 增量更新/重建）、test_bm25_indexer_roundtrip 7/7 |
+| C9 | SparseEncoder | [ ] | | |
+| C10 | BatchProcessor | [ ] | | |
+| C11 | BM25Indexer（倒排索引+IDF计算） | [ ] | | |
 | C12 | VectorUpserter（幂等upsert） | [ ] | | |
 | C13 | ImageStorage（图片存储+SQLite索引） | [ ] | | |
 | C14 | Pipeline 编排（MVP 串起来） | [ ] | | |

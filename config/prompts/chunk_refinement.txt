@@ -11,3 +11,5 @@ Given a text chunk, refine it by:
 - Making it more searchable
 
 Original chunk:
+
+{text}

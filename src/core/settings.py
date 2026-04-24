@@ -339,6 +339,27 @@ class VisionLLMSettings:
 
 
 @dataclass(frozen=True)
+class ChunkRefinerSettings:
+    """Chunk text refinement (rule + optional LLM)."""
+
+    use_llm: bool = False
+
+
+@dataclass(frozen=True)
+class MetadataEnricherSettings:
+    """Chunk metadata enrichment (rule + optional LLM)."""
+
+    use_llm: bool = False
+
+
+@dataclass(frozen=True)
+class ImageCaptionerSettings:
+    """Image captioning (optional Vision LLM; graceful fallback)."""
+
+    use_vision_llm: bool = False
+
+
+@dataclass(frozen=True)
 class IngestionSettings:
     """Ingestion pipeline configuration."""
 
@@ -346,6 +367,9 @@ class IngestionSettings:
     chunk_overlap: int
     splitter: str
     batch_size: int
+    chunk_refiner: Optional[ChunkRefinerSettings] = None
+    metadata_enricher: Optional[MetadataEnricherSettings] = None
+    image_captioner: Optional[ImageCaptionerSettings] = None
 
 
 @dataclass(frozen=True)
@@ -390,11 +414,40 @@ class Settings:
         ingestion_settings = None
         if "ingestion" in data:
             ingestion = _require_mapping(data, "ingestion", "settings")
+            chunk_refiner: Optional[ChunkRefinerSettings] = None
+            if "chunk_refiner" in ingestion and ingestion["chunk_refiner"] is not None:
+                cr = ingestion["chunk_refiner"]
+                if not isinstance(cr, dict):
+                    raise SettingsError("ingestion.chunk_refiner must be a mapping when present")
+                chunk_refiner = ChunkRefinerSettings(
+                    use_llm=_require_bool(cr, "use_llm", "ingestion.chunk_refiner"),
+                )
+            metadata_enricher: Optional[MetadataEnricherSettings] = None
+            if "metadata_enricher" in ingestion and ingestion["metadata_enricher"] is not None:
+                me = ingestion["metadata_enricher"]
+                if not isinstance(me, dict):
+                    raise SettingsError("ingestion.metadata_enricher must be a mapping when present")
+                metadata_enricher = MetadataEnricherSettings(
+                    use_llm=_require_bool(me, "use_llm", "ingestion.metadata_enricher"),
+                )
+            image_captioner: Optional[ImageCaptionerSettings] = None
+            if "image_captioner" in ingestion and ingestion["image_captioner"] is not None:
+                ic = ingestion["image_captioner"]
+                if not isinstance(ic, dict):
+                    raise SettingsError("ingestion.image_captioner must be a mapping when present")
+                image_captioner = ImageCaptionerSettings(
+                    use_vision_llm=_require_bool(
+                        ic, "use_vision_llm", "ingestion.image_captioner"
+                    ),
+                )
             ingestion_settings = IngestionSettings(
                 chunk_size=_require_int(ingestion, "chunk_size", "ingestion"),
                 chunk_overlap=_require_int(ingestion, "chunk_overlap", "ingestion"),
                 splitter=_require_str(ingestion, "splitter", "ingestion"),
                 batch_size=_require_int(ingestion, "batch_size", "ingestion"),
+                chunk_refiner=chunk_refiner,
+                metadata_enricher=metadata_enricher,
+                image_captioner=image_captioner,
             )
 
         settings = cls(

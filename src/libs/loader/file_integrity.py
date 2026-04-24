@@ -12,7 +12,14 @@ from typing import Optional
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DB_PATH = REPO_ROOT / "data" / "db" / "ingestion_history.db"
 
+# “内容哈希 + 历史状态”机制：
 
+# 用 SHA256 表示“文件内容指纹”
+# 在 SQLite 里记录这个指纹的处理状态（success/failed）
+# 下次看到同 hash 且 status=success 就直接 skip
+
+
+# FileIntegrityChecker 类定义了文件完整性检查的抽象接口，包括计算 SHA256 哈希、检查是否跳过、标记成功和失败。
 class FileIntegrityChecker(ABC):
     """Abstract interface for ingestion file integrity tracking."""
 
@@ -33,6 +40,7 @@ class FileIntegrityChecker(ABC):
         raise NotImplementedError
 
 
+# SQLiteIntegrityChecker 类实现了 SQLite 作为持久化存储的文件完整性检查器。它继承自 FileIntegrityChecker 抽象基类，并实现了具体的文件处理逻辑。
 class SQLiteIntegrityChecker(FileIntegrityChecker):
     """SQLite-backed checker for deduping unchanged ingested files."""
 

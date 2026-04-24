@@ -1,0 +1,34 @@
+{
+  "typical_noise_scenario": {
+    "description": "Headers, footers, messy blank lines",
+    "text": "CONFIDENTIAL\n\nReal paragraph one.\n\n\n\nReal paragraph two.\n\nFooter — Page 3 of 99\n"
+  },
+  "ocr_errors": {
+    "description": "Extra spaces mimicking OCR",
+    "text": "The   quick\t\tbrown  fox  jumps."
+  },
+  "page_header_footer": {
+    "description": "Page x of y lines",
+    "text": "Intro line.\nPage 2 of 10\nBody continues here."
+  },
+  "excessive_whitespace": {
+    "description": "Collapsed spaces and blank lines",
+    "text": "Line   one\n\n\n\nLine   two"
+  },
+  "format_markers": {
+    "description": "HTML comment noise",
+    "text": "Visible <!-- secret comment --> content here."
+  },
+  "clean_text": {
+    "description": "Already clean; should stay readable",
+    "text": "Single paragraph with normal spacing."
+  },
+  "code_blocks": {
+    "description": "Fenced code must keep inner newlines",
+    "text": "Before code.\n\n```python\ndef f():\n    return 42\n```\n\nAfter code."
+  },
+  "mixed_noise": {
+    "description": "Combine comments, page line, whitespace",
+    "text": "Start <!-- c --> \n\nPage 1 of 2\n\nMiddle   text\n\n---\n\nEnd."
+  }
+}

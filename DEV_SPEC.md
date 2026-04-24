@@ -1984,14 +1984,14 @@ dashboard:
 | C1 | 定义核心数据类型/契约（Document/Chunk/ChunkRecord） | [x] | 2026-04-23 | types.py 契约、校验与 test_core_types 通过 |
 | C2 | 文件完整性检查（SHA256） | [x] | 2026-04-23 | SQLiteIntegrityChecker（WAL）+ SHA256 + 并发写入测试通过 |
 | C3 | Loader 抽象基类与 PDF Loader | [x] | 2026-04-23 | BaseLoader/PdfLoader（文本+图片占位符+降级）与契约测试通过 |
-| C4 | Splitter 集成（调用 Libs） | [ ] | | |
-| C5 | Transform 基类 + ChunkRefiner | [ ] | | |
-| C6 | MetadataEnricher | [ ] | | |
-| C7 | ImageCaptioner | [ ] | | |
-| C8 | DenseEncoder | [ ] | | |
-| C9 | SparseEncoder | [ ] | | |
-| C10 | BatchProcessor | [ ] | | |
-| C11 | BM25Indexer（倒排索引+IDF计算） | [ ] | | |
+| C4 | Splitter 集成（调用 Libs） | [x] | 2026-04-24 | DocumentChunker + SplitterFactory、按需 images/image_refs、test_document_chunker 15/15 |
+| C5 | Transform 基类 + ChunkRefiner | [x] | 2026-04-24 | BaseTransform/ChunkRefiner、TraceContext 占位、noisy_chunks 夹具、单测 29、集成测试需 CHUNK_REFINER_LLM_INTEGRATION=1 |
+| C6 | MetadataEnricher | [x] | 2026-04-24 | MetadataEnricher、metadata_enrichment prompt、Settings.metadata_enricher、test_metadata_enricher_contract、集成需 METADATA_ENRICHER_LLM_INTEGRATION=1 |
+| C7 | ImageCaptioner | [x] | 2026-04-24 | ImageCaptioner、image_captioning prompt fallback、test_image_captioner_fallback 6/6 |
+| C8 | DenseEncoder | [x] | 2026-04-24 | DenseEncoder、ingestion.embedding 模块、test_dense_encoder 7/7 |
+| C9 | SparseEncoder | [x] | 2026-04-24 | SparseEncoder（BM25 term stats）、test_sparse_encoder 6/6 |
+| C10 | BatchProcessor | [x] | 2026-04-24 | BatchProcessor（dense+sparse 批处理编排）、test_batch_processor 7/7 |
+| C11 | BM25Indexer（倒排索引+IDF计算） | [x] | 2026-04-24 | BM25Indexer（build/load/query + 增量更新/重建）、test_bm25_indexer_roundtrip 7/7 |
 | C12 | VectorUpserter（幂等upsert） | [ ] | | |
 | C13 | ImageStorage（图片存储+SQLite索引） | [ ] | | |
 | C14 | Pipeline 编排（MVP 串起来） | [ ] | | |

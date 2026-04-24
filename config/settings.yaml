@@ -98,3 +98,7 @@ ingestion:
   batch_size: 100
   chunk_refiner:
     use_llm: true
+  metadata_enricher:
+    use_llm: true
+  image_captioner:
+    use_vision_llm: true
