@@ -6,12 +6,14 @@ from .base_vector_store import (
     VectorRecord,
     VectorStoreSettings,
 )
-from .chroma_store import ChromaStore
+from .chroma_store import ChromaStore, decode_collection_name, encode_collection_name
 from .vector_store_factory import VectorStoreFactory
 
 __all__ = [
     "BaseVectorStore",
     "ChromaStore",
+    "decode_collection_name",
+    "encode_collection_name",
     "QueryResult",
     "VectorRecord",
     "VectorStoreFactory",

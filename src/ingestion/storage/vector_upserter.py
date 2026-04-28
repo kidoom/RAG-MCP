@@ -13,6 +13,7 @@ from libs.vector_store import (
     VectorRecord,
     VectorStoreFactory,
     VectorStoreSettings,
+    encode_collection_name,
 )
 
 
@@ -69,12 +70,13 @@ class VectorUpserter:
             if isinstance(collection, str) and collection.strip()
             else self._settings.vector_store.collection_name
         )
+        chroma_name = encode_collection_name(target_collection)
 
-        if target_collection != self._settings.vector_store.collection_name:
+        if chroma_name != self._settings.vector_store.collection_name:
             store_settings = VectorStoreSettings(
                 provider=self._settings.vector_store.provider,
                 persist_directory=self._settings.vector_store.persist_directory,
-                collection_name=target_collection,
+                collection_name=chroma_name,
             )
             store = VectorStoreFactory.create(store_settings)
         else:

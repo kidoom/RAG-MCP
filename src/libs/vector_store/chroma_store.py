@@ -14,6 +14,33 @@ except ImportError as exc:  # pragma: no cover - environment dependent
     ) from exc
 
 import json
+import re
+
+# ChromaDB collection name constraint: 3-512 chars from [a-zA-Z0-9._-],
+# must start and end with [a-zA-Z0-9].
+_CHROMA_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{1,510}[a-zA-Z0-9]$")
+
+
+def encode_collection_name(name: str) -> str:
+    """Encode a collection name for ChromaDB compatibility.
+
+    Names that already satisfy ChromaDB's [a-zA-Z0-9._-] rule are returned
+    unchanged.  Non-ASCII names are hex-encoded with an ``x_`` prefix so
+    they can be stored in ChromaDB and later decoded for display.
+    """
+    if _CHROMA_NAME_RE.match(name):
+        return name
+    return "x_" + name.encode("utf-8").hex()
+
+
+def decode_collection_name(encoded: str) -> str:
+    """Decode a collection name back to its original form."""
+    if encoded.startswith("x_"):
+        try:
+            return bytes.fromhex(encoded[2:]).decode("utf-8")
+        except (ValueError, UnicodeDecodeError, IndexError):
+            pass
+    return encoded
 
 
 def _sanitize_metadata(meta: Dict[str, Any]) -> Dict[str, Any]:

@@ -11,7 +11,7 @@ from ingestion.storage.bm25_indexer import BM25Indexer
 from ingestion.storage.image_storage import ImageStorage
 from libs.loader.file_integrity import FileIntegrityChecker, SQLiteIntegrityChecker
 from libs.vector_store.base_vector_store import VectorStoreSettings
-from libs.vector_store.chroma_store import ChromaStore
+from libs.vector_store.chroma_store import ChromaStore, decode_collection_name, encode_collection_name
 
 
 @dataclass
@@ -91,15 +91,19 @@ class DocumentManager:
         self._bm25.load()
 
         source_map: Dict[str, Dict[str, Any]] = {}
-        collections = (
-            [collection] if collection else self._chroma.get_all_collections()
+        raw_collections = (
+            [encode_collection_name(collection)]
+            if collection
+            else self._chroma.get_all_collections()
         )
 
-        for coll_name in collections:
-            # Query the actual ChromaDB collection — ChromaStore is bound to a
-            # single default collection, so we must reach the PersistentClient.
+        for chroma_name in raw_collections:
+            # Decode for display and image queries (ImageStorage uses original names)
+            display_name = decode_collection_name(chroma_name)
+
+            # Query the correct ChromaDB collection
             try:
-                chroma_coll = self._chroma._client.get_collection(name=coll_name)
+                chroma_coll = self._chroma._client.get_collection(name=chroma_name)
                 response = chroma_coll.get(include=["documents", "metadatas"])
                 results: List[Dict[str, Any]] = [
                     {
@@ -128,14 +132,14 @@ class DocumentManager:
                 if sp not in doc_id_by_source:
                     doc_id_by_source[sp] = md.get("parent_doc_id", "")
 
-            # Pre-fetch all images for this collection once
+            # Pre-fetch all images for this collection once (use original name)
             try:
-                all_imgs = self._images.list_images(coll_name)
+                all_imgs = self._images.list_images(display_name)
             except Exception:
                 all_imgs = []
 
             for sp, chunk_count in seen_sources.items():
-                key = f"{coll_name}|{sp}"
+                key = f"{display_name}|{sp}"
                 doc_hash = doc_id_by_source.get(sp, "")
                 actual_img_count = sum(
                     1 for img in all_imgs
@@ -144,7 +148,7 @@ class DocumentManager:
 
                 source_map[key] = {
                     "source_path": sp,
-                    "collection": coll_name,
+                    "collection": display_name,
                     "chunk_count": chunk_count,
                     "image_count": actual_img_count,
                 }
@@ -165,10 +169,11 @@ class DocumentManager:
     def get_document_detail(self, doc_id: str, collection: Optional[str] = None) -> Optional[DocumentDetail]:
         """Get full detail for a document by its doc_id or source_path."""
         coll_name = collection or load_settings().vector_store.collection_name
+        chroma_name = encode_collection_name(coll_name)
 
         # Query the correct ChromaDB collection, not the default binding
         try:
-            chroma_coll = self._chroma._client.get_collection(name=coll_name)
+            chroma_coll = self._chroma._client.get_collection(name=chroma_name)
         except Exception:
             return None
 
@@ -241,11 +246,12 @@ class DocumentManager:
     ) -> DeleteResult:
         """Delete a document from all storage backends."""
         coll_name = collection or load_settings().vector_store.collection_name
+        chroma_name = encode_collection_name(coll_name)
         result = DeleteResult(source_path=source_path, success=False)
 
         try:
             # 1. Delete from Chroma — use the correct collection
-            chroma_coll = self._chroma._client.get_collection(name=coll_name)
+            chroma_coll = self._chroma._client.get_collection(name=chroma_name)
             existing = chroma_coll.get(
                 where={"source_path": source_path}, include=[]
             )
@@ -307,10 +313,11 @@ class DocumentManager:
     ) -> CollectionStats:
         """Get aggregated statistics across all stores."""
         coll_name = collection or load_settings().vector_store.collection_name
+        chroma_name = encode_collection_name(coll_name)
 
         # Query the correct ChromaDB collection, not the default binding
         try:
-            chroma_coll = self._chroma._client.get_collection(name=coll_name)
+            chroma_coll = self._chroma._client.get_collection(name=chroma_name)
             chroma_count = chroma_coll.count()
         except Exception:
             chroma_count = 0
