@@ -27,8 +27,13 @@ def get_document_summary(arguments: Dict[str, Any]) -> Dict[str, Any]:
         )
     )
 
-    # Reuse get_by_ids path first (when caller passes chunk id directly as doc_id).
+    # Try chunk-level lookup first, then document-level via parent_doc_id.
     records = vector_store.get_by_ids([doc_id])
+    if not records:
+        records = vector_store.get_by_metadata({"parent_doc_id": doc_id})
+    if not records:
+        # Also try source_path match (full path or just filename).
+        records = vector_store.get_by_metadata({"source_path": doc_id})
     if not records:
         raise ValueError(f"doc_id not found: {doc_id}")
 

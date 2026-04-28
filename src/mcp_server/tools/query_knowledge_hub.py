@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, List
 
 from core.query_engine import (
     DenseRetriever,
@@ -17,11 +17,6 @@ from core.settings import load_settings
 from core.types import RetrievalResult
 
 
-def _build_filters(collection: str) -> Dict[str, Any]:
-    if collection.strip():
-        return {"collection": collection.strip()}
-    return {}
-
 
 def query_knowledge_hub(arguments: Dict[str, Any]) -> Dict[str, Any]:
     """Run hybrid retrieval + reranker and return MCP response payload."""
@@ -34,8 +29,6 @@ def query_knowledge_hub(arguments: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("top_k must be positive")
     top_k = min(top_k, 20)
 
-    collection = str(arguments.get("collection", ""))
-    filters = _build_filters(collection)
     builder = ResponseBuilder()
 
     try:
@@ -53,7 +46,7 @@ def query_knowledge_hub(arguments: Dict[str, Any]) -> Dict[str, Any]:
         )
         reranker = Reranker(settings=settings)
 
-        results: List[RetrievalResult] = hybrid.search(query=query, top_k=top_k, filters=filters)
+        results: List[RetrievalResult] = hybrid.search(query=query, top_k=top_k)
         if results:
             results = reranker.rerank(
                 query=query,

@@ -276,8 +276,11 @@ class IngestionPipeline:
         stage = "store"
         t0 = time.monotonic()
         try:
-            self._bm25_indexer.build(records, rebuild=False, persist=True)
+            # Upsert first so deterministic chunk_ids are computed (VectorUpserter
+            # owns the canonical id generation per C12).  Pass the returned records
+            # with stable ids to BM25 so both stores share the same chunk_id space.
             upserted = self._vector_upserter.upsert(records, trace=trace)
+            self._bm25_indexer.build(upserted, rebuild=False, persist=True)
             trace.record_stage(
                 stage,
                 record_count=len(upserted),

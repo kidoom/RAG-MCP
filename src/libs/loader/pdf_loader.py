@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from src.core import Document, format_image_placeholder, validate_document_contract
+from core.types import Document, format_image_placeholder, validate_document_contract
 
 from .base_loader import BaseLoader
 
