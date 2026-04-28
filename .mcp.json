@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "modular-rag": {
+      "type": "stdio",
+      "command": "D:\\MODULAR-RAG-MCP-SERVER\\.venv\\Scripts\\python.exe",
+      "args": [
+        "-m",
+        "mcp_server.server"
+      ],
+      "env": {
+        "PYTHONPATH": "D:\\MODULAR-RAG-MCP-SERVER\\src"
+      }
+    }
+  }
+}

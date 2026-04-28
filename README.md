@@ -122,6 +122,154 @@ Agent 会自动引导你完成全部配置流程。
 
 > 💡 如果不熟悉 Skill 的使用方式，请观看配套笔记中的 **Setup Skill 使用讲解视频**。
 
+### 3. 手动配置与环境搭建
+
+如果你不想使用 Setup Skill，也可以手动完成所有步骤：
+
+#### 3.1 安装依赖
+
+```bash
+pip install -e .
+pip install -e ".[dev]"  # 包含测试依赖
+```
+
+#### 3.2 配置 settings.yaml
+
+编辑 `config/settings.yaml`，关键字段说明：
+
+```yaml
+llm:                           # LLM 生成模型配置
+  provider: "openai"           # openai / azure / ollama / gemini / qwen / deepseek
+  model: "gpt-4o"
+  api_key: "sk-xxx"           # 支持环境变量 ${VAR_NAME}
+
+embedding:                     # Embedding 模型配置
+  provider: "openai"           # openai / azure / ollama / qwen / local
+  model: "text-embedding-3-small"
+  dimensions: 1536
+
+vector_store:                  # 向量存储
+  provider: "chroma"
+  persist_directory: "./data/db/chroma"
+  collection_name: "knowledge_hub"
+
+retrieval:                     # 检索参数
+  dense_top_k: 20
+  sparse_top_k: 20
+  fusion_top_k: 10
+  rrf_k: 60
+
+rerank:                        # 重排序
+  enabled: true
+  provider: "llm"              # llm / cross_encoder / none
+  top_k: 5
+
+evaluation:                    # 评估
+  enabled: false
+  provider: "custom"           # custom / ragas
+  metrics: ["hit_rate", "mrr"]
+
+observability:                 # 可观测性
+  log_level: "INFO"
+  trace_enabled: true
+  trace_file: "./logs/traces.jsonl"
+
+ingestion:                     # 数据摄取
+  chunk_size: 1000
+  chunk_overlap: 200
+  splitter: "recursive"
+  batch_size: 100
+```
+
+### 4. MCP 配置示例
+
+将 MCP Server 接入 AI 工具，只需在对应工具的配置文件中添加本项目：
+
+#### GitHub Copilot (VS Code)
+
+在你的项目根目录创建 `.vscode/mcp.json`：
+
+```json
+{
+  "servers": {
+    "modular-rag": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["-m", "mcp_server.server"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      }
+    }
+  }
+}
+```
+
+#### Claude Desktop
+
+编辑 `claude_desktop_config.json`（通常在 `%APPDATA%\Claude\` 或 `~/Library/Application Support/Claude/`）：
+
+```json
+{
+  "mcpServers": {
+    "modular-rag": {
+      "command": "python",
+      "args": ["-m", "mcp_server.server"],
+      "cwd": "D:/MODULAR-RAG-MCP-SERVER",
+      "env": {
+        "PYTHONPATH": "D:/MODULAR-RAG-MCP-SERVER/src"
+      }
+    }
+  }
+}
+```
+
+配置后重启对应工具，即可在对话中调用 `query_knowledge_hub`、`list_collections`、`get_document_summary` 三个 MCP Tool。
+
+### 5. Dashboard 使用指南
+
+#### 启动命令
+
+```bash
+# 方式一：使用启动脚本
+python scripts/start_dashboard.py
+
+# 方式二：直接启动
+PYTHONPATH=src streamlit run src/observability/dashboard/app.py
+```
+
+默认访问 `http://localhost:8501`。
+
+#### 六大页面功能
+
+| 页面 | 功能 |
+|------|------|
+| **System Overview** | 展示所有组件配置卡片（LLM / Embedding / VectorStore / Retrieval / Reranker / Evaluation），实时数据统计（Chroma 条目数、BM25 文档数、图片数） |
+| **Data Browser** | 浏览已摄入文档列表（支持集合筛选），展开查看 Chunk 详情（文本内容、Metadata），预览关联图片 |
+| **Ingestion Manager** | 上传文件（PDF / TXT / MD 等）触发摄取，实时进度条展示各阶段进度，支持 Force Re-ingest 和跨存储协调删除 |
+| **Ingestion Traces** | 摄取历史列表，阶段耗时瀑布图（Bar Chart），展示 load / split / transform / encode / upsert 各环节耗时 |
+| **Query Traces** | 查询历史列表（支持关键词搜索），Dense vs Sparse 结果数对比，Rerank 前后排名变化分析 |
+| **Evaluation** | 选择评估后端（Custom / Ragas）与 Golden Test Set，运行评估并展示 Hit Rate / MRR 等指标，支持历史报告查看 |
+
+### 6. 运行测试
+
+```bash
+# 单元测试（281 个）
+pytest tests/unit/ -q
+
+# 集成测试（需要 ChromaDB + 本地依赖）
+pytest tests/integration/ -q
+
+# E2E 测试（全链路）
+pytest tests/e2e/ -q
+
+# 全部测试
+pytest tests/ -q
+
+# 跳过 LLM 依赖的测试
+pytest tests/ -q -m "not slow"
+```
+
 ---
 
 ## 🎯 谁适合用这个项目 & 怎么用

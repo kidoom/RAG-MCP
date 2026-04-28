@@ -14,8 +14,8 @@ from .sparse_encoder import SparseEncoder
 
 
 class BatchProcessor:
+    
     """Split chunks into batches and run dense/sparse encoders per batch."""
-
     def __init__(
         self,
         settings: Settings,

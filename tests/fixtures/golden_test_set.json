@@ -1,0 +1,29 @@
+{
+  "test_cases": [
+    {
+      "query": "How to configure Azure OpenAI?",
+      "expected_chunk_ids": ["chunk_azure_001", "chunk_azure_002"],
+      "expected_sources": ["config_guide.pdf"]
+    },
+    {
+      "query": "What is RAG architecture?",
+      "expected_chunk_ids": ["chunk_rag_001"],
+      "expected_sources": ["rag_overview.pdf"]
+    },
+    {
+      "query": "How does vector search work?",
+      "expected_chunk_ids": ["chunk_vector_001", "chunk_vector_002"],
+      "expected_sources": ["vector_search_guide.pdf"]
+    },
+    {
+      "query": "Explain BM25 scoring",
+      "expected_chunk_ids": ["chunk_bm25_001"],
+      "expected_sources": ["retrieval_guide.pdf"]
+    },
+    {
+      "query": "How to configure settings.yaml for the RAG system?",
+      "expected_chunk_ids": ["chunk_settings_001", "chunk_settings_002"],
+      "expected_sources": ["configuration.pdf"]
+    }
+  ]
+}

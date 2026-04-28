@@ -39,6 +39,14 @@ class FileIntegrityChecker(ABC):
     def mark_failed(self, file_hash: str, file_path: str, error_msg: str) -> None:
         raise NotImplementedError
 
+    @abstractmethod
+    def remove_record(self, file_hash: str) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_processed(self) -> list:
+        raise NotImplementedError
+
 
 # SQLiteIntegrityChecker 类实现了 SQLite 作为持久化存储的文件完整性检查器。它继承自 FileIntegrityChecker 抽象基类，并实现了具体的文件处理逻辑。
 class SQLiteIntegrityChecker(FileIntegrityChecker):
@@ -51,6 +59,7 @@ class SQLiteIntegrityChecker(FileIntegrityChecker):
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(self.db_path), timeout=30, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA synchronous=NORMAL;")
         return conn
@@ -125,3 +134,33 @@ class SQLiteIntegrityChecker(FileIntegrityChecker):
                 """,
                 (file_hash, file_path, now, error_msg),
             )
+
+    def remove_record(self, file_hash: str) -> bool:
+        """Delete a record from ingestion_history. Returns True if removed."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "DELETE FROM ingestion_history WHERE file_hash = ?",
+                (file_hash,),
+            )
+            return cursor.rowcount > 0
+
+    def list_processed(self) -> list:
+        """List all processed files from ingestion_history."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT file_hash, file_path, status, processed_at, error_msg
+                FROM ingestion_history
+                ORDER BY processed_at DESC
+                """
+            ).fetchall()
+        return [
+            {
+                "file_hash": row["file_hash"],
+                "file_path": row["file_path"],
+                "status": row["status"],
+                "processed_at": row["processed_at"],
+                "error_msg": row["error_msg"],
+            }
+            for row in rows
+        ]

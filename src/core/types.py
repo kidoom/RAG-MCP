@@ -212,8 +212,38 @@ class ChunkRecord:
         )
 
 
+@dataclass
+class RetrievalResult:
+    """Normalized retrieval payload returned by query engine modules."""
+
+    chunk_id: str
+    score: float
+    text: str
+    metadata: Dict[str, Any]
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "chunk_id": self.chunk_id,
+            "score": float(self.score),
+            "text": self.text,
+            "metadata": dict(self.metadata),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "RetrievalResult":
+        md = data.get("metadata") or {}
+        if not isinstance(md, Mapping):
+            raise TypeError("metadata must be a mapping")
+        return cls(
+            chunk_id=str(data["chunk_id"]),
+            score=float(data["score"]),
+            text=str(data["text"]),
+            metadata=dict(md),
+        )
+
+
 # 将 core 类型序列化为 JSON 字符串，确保排序和 ASCII 安全。
-def to_json(obj: Union[Document, Chunk, ChunkRecord]) -> str:
+def to_json(obj: Union[Document, Chunk, ChunkRecord, RetrievalResult]) -> str:
     """Serialize a core type to a stable JSON string (UTF-8, sorted keys)."""
     return json.dumps(
         obj.to_dict(), ensure_ascii=False, sort_keys=True, separators=(",", ":")

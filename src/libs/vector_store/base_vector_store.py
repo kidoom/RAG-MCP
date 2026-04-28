@@ -61,5 +61,12 @@ class BaseVectorStore(ABC):
     ) -> List[QueryResult]:
         """Search for top-k nearest records matching query constraints."""
         raise NotImplementedError
-    
-"不写删除操作是因为 对于向量数据库的处理 一般不做物理删除 而是通过覆盖来实现 所谓的删除旧数据"
+
+    @abstractmethod
+    def get_by_ids(
+        self,
+        ids: List[str],
+        trace: Optional[Any] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetch records by chunk IDs with text and metadata payload."""
+        raise NotImplementedError

@@ -1992,74 +1992,74 @@ dashboard:
 | C9 | SparseEncoder | [x] | 2026-04-24 | SparseEncoder（BM25 term stats）、test_sparse_encoder 6/6 |
 | C10 | BatchProcessor | [x] | 2026-04-24 | BatchProcessor（dense+sparse 批处理编排）、test_batch_processor 7/7 |
 | C11 | BM25Indexer（倒排索引+IDF计算） | [x] | 2026-04-24 | BM25Indexer（build/load/query + 增量更新/重建）、test_bm25_indexer_roundtrip 7/7 |
-| C12 | VectorUpserter（幂等upsert） | [ ] | | |
-| C13 | ImageStorage（图片存储+SQLite索引） | [ ] | | |
-| C14 | Pipeline 编排（MVP 串起来） | [ ] | | |
-| C15 | 脚本入口 ingest.py | [ ] | | |
+| C12 | VectorUpserter（幂等upsert） | [x] | 2026-04-25 | VectorUpserter（稳定ID+幂等upsert）与 test_vector_upserter_idempotency 5/5 通过 |
+| C13 | ImageStorage（图片存储+SQLite索引） | [x] | 2026-04-25 | image_storage + SQLite(WAL) 索引已完成，test_image_storage 5/5 通过 |
+| C14 | Pipeline 编排（MVP 串起来） | [x] | 2026-04-25 | IngestionPipeline（integrity→load→split→transform→encode→store）+ test_ingestion_pipeline 2/2 |
+| C15 | 脚本入口 ingest.py | [x] | 2026-04-25 | scripts/ingest.py（--collection/--path/--force）+ test_data_ingestion 2/2 |
 
 #### 阶段 D：Retrieval MVP
 
 | 任务编号 | 任务名称 | 状态 | 完成日期 | 备注 |
 |---------|---------|------|---------|------|
-| D1 | QueryProcessor（关键词提取 + filters） | [ ] | | |
-| D2 | DenseRetriever（调用 VectorStore.query） | [ ] | | |
-| D3 | SparseRetriever（BM25 查询） | [ ] | | |
-| D4 | RRF Fusion | [ ] | | |
-| D5 | HybridSearch 编排 | [ ] | | |
-| D6 | Reranker（Core 层编排 + Fallback） | [ ] | | |
-| D7 | 脚本入口 query.py（查询可用） | [ ] | | |
+| D1 | QueryProcessor（关键词提取 + filters） | [x] | 2026-04-25 | 完成关键词提取与 filters 规范化；test_query_processor 7/7 通过 |
+| D2 | DenseRetriever（调用 VectorStore.query） | [x] | 2026-04-25 | 新增 DenseRetriever + RetrievalResult 契约；test_dense_retriever 3/3 通过 |
+| D3 | SparseRetriever（BM25 查询） | [x] | 2026-04-25 | 实现 SparseRetriever + Base/Chroma get_by_ids；test_sparse_retriever 3/3 通过 |
+| D4 | RRF Fusion | [x] | 2026-04-25 | 实现 Fusion(RRF) 排序融合（deterministic + 可配置 rrf_k）；test_fusion_rrf 3/3 通过 |
+| D5 | HybridSearch 编排 | [x] | 2026-04-25 | 新增 HybridSearch（并行 dense+sparse、RRF 融合、metadata 后置过滤、单路失败降级）；新增 test_hybrid_search 覆盖主流程与回退 |
+| D6 | Reranker（Core 层编排 + Fallback） | [x] | 2026-04-25 | 新增 core.reranker 编排，接入 libs.reranker 并在异常/超时信号时回退 fusion 顺序，标记 fallback 信息；新增 test_reranker_fallback |
+| D7 | 脚本入口 query.py（查询可用） | [x] | 2026-04-25 | 新增 scripts/query.py，支持 --query/--top-k/--collection/--verbose/--no-rerank，串联 HybridSearch + Reranker 并输出结果 |
 
 #### 阶段 E：MCP Server 层与 Tools
 
 | 任务编号 | 任务名称 | 状态 | 完成日期 | 备注 |
 |---------|---------|------|---------|------|
-| E1 | MCP Server 入口与 Stdio 约束 | [ ] | | |
-| E2 | Protocol Handler 协议解析与能力协商 | [ ] | | |
-| E3 | query_knowledge_hub Tool | [ ] | | |
-| E4 | list_collections Tool | [ ] | | |
-| E5 | get_document_summary Tool | [ ] | | |
-| E6 | 多模态返回组装（Text + Image） | [ ] | | |
+| E1 | MCP Server 入口与 Stdio 约束 | [x] | 2026-04-27 | 新增 `mcp_server/server.py`（stdio JSON-RPC 入口，initialize 握手），日志仅 stderr；`test_mcp_server` 子进程验证通过 |
+| E2 | Protocol Handler 协议解析与能力协商 | [x] | 2026-04-27 | 新增 `protocol_handler.py`（initialize/tools/list/tools/call + JSON-RPC 错误码映射），`server.py` 接入协议分发；`test_protocol_handler` 6/6 通过 |
+| E3 | query_knowledge_hub Tool | [x] | 2026-04-27 | 新增 `query_knowledge_hub` + `response_builder` + `citation_generator`，接入 server tools 注册与 tools/list、tools/call；`test_response_builder` + `test_mcp_server` 覆盖通过 |
+| E4 | list_collections Tool | [x] | 2026-04-27 | 新增 `list_collections.py`，列出 `data/documents` 集合并返回结构化列表；新增 `test_list_collections` |
+| E5 | get_document_summary Tool | [x] | 2026-04-27 | 新增 `get_document_summary.py`，按 `doc_id` 返回 title/summary/tags，不存在返回规范错误；新增 `test_get_document_summary` |
+| E6 | 多模态返回组装（Text + Image） | [x] | 2026-04-27 | 新增 `multimodal_assembler.py`，`ResponseBuilder` 组装 text+image，命中 image_refs/images 时返回 base64 image content；`test_mcp_server` 补图像返回用例 |
 
 #### 阶段 F：Trace 基础设施与打点
 
 | 任务编号 | 任务名称 | 状态 | 完成日期 | 备注 |
 |---------|---------|------|---------|------|
-| F1 | TraceContext 增强（finish + 耗时统计 + trace_type） | [ ] | | |
-| F2 | 结构化日志 logger（JSON Lines） | [ ] | | |
-| F3 | 在 Query 链路打点 | [ ] | | |
-| F4 | 在 Ingestion 链路打点 | [ ] | | |
-| F5 | Pipeline 进度回调 (on_progress) | [ ] | | |
+| F1 | TraceContext 增强（finish + 耗时统计 + trace_type） | [x] | 2026-04-27 | trace_context 增强 + trace_collector；test_trace_context 12/12 通过 |
+| F2 | 结构化日志 logger（JSON Lines） | [x] | 2026-04-27 | JSONFormatter + get_trace_logger + write_trace；test_jsonl_logger 5/5 通过 |
+| F3 | 在 Query 链路打点 | [x] | 2026-04-27 | HybridSearch.search + Reranker.rerank 接入 trace；test_hybrid_search + test_reranker_fallback 覆盖 |
+| F4 | 在 Ingestion 链路打点 | [x] | 2026-04-27 | Pipeline 各 _stage_* 添加 elapsed_ms/method；test_ingestion_pipeline 覆盖 |
+| F5 | Pipeline 进度回调 (on_progress) | [x] | 2026-04-27 | ProgressCallback + _fire + _estimate_chunk_count；test_pipeline_progress 5/5 通过 |
 
 #### 阶段 G：可视化管理平台 Dashboard
 
 | 任务编号 | 任务名称 | 状态 | 完成日期 | 备注 |
 |---------|---------|------|---------|------|
-| G1 | Dashboard 基础架构与系统总览页 | [ ] | | |
-| G2 | DocumentManager 实现 | [ ] | | |
-| G3 | 数据浏览器页面 | [ ] | | |
-| G4 | Ingestion 管理页面 | [ ] | | |
-| G5 | Ingestion 追踪页面 | [ ] | | |
-| G6 | Query 追踪页面 | [ ] | | |
+| G1 | Dashboard 基础架构与系统总览页 | [x] | 2026-04-27 | app.py 多页面导航 + overview 页面 + ConfigService + 启动脚本 |
+| G2 | DocumentManager 实现 | [x] | 2026-04-27 | 跨存储文档生命周期管理 (list/delete/stats) + Chroma/BM25/Image/Integrity 增强 |
+| G3 | 数据浏览器页面 | [x] | 2026-04-27 | data_browser.py + DataService：文档列表/Chunk详情/图片预览 |
+| G4 | Ingestion 管理页面 | [x] | 2026-04-27 | ingestion_manager.py：文件上传触发摄取、实时进度条、文档删除 |
+| G5 | Ingestion 追踪页面 | [x] | 2026-04-27 | ingestion_traces.py + TraceService：历史列表、阶段耗时瀑布图 |
+| G6 | Query 追踪页面 | [x] | 2026-04-27 | query_traces.py：查询历史、Dense/Sparse对比、Rerank变化 |
 
 #### 阶段 H：评估体系
 
 | 任务编号 | 任务名称 | 状态 | 完成日期 | 备注 |
 |---------|---------|------|---------|------|
-| H1 | RagasEvaluator 实现 | [ ] | | |
-| H2 | CompositeEvaluator 实现 | [ ] | | |
-| H3 | EvalRunner + Golden Test Set | [ ] | | |
-| H4 | 评估面板页面 | [ ] | | |
-| H5 | Recall 回归测试（E2E） | [ ] | | |
+| H1 | RagasEvaluator 实现 | [x] | 2026-04-27 | RagasEvaluator(BaseEvaluator) + 优雅 ImportError + evaluator_factory 注册 |
+| H2 | CompositeEvaluator 实现 | [x] | 2026-04-27 | 并行执行多 Evaluator + 指标合并 + 前缀命名 |
+| H3 | EvalRunner + Golden Test Set | [x] | 2026-04-27 | eval_runner.py + golden_test_set.json (5条) + scripts/evaluate.py |
+| H4 | 评估面板页面 | [x] | 2026-04-27 | evaluation_panel.py：选择后端、运行评估、指标展示、历史报告 |
+| H5 | Recall 回归测试（E2E） | [x] | 2026-04-27 | test_recall.py：golden set 验证 + hit@k/mrr 阈值回归 |
 
 #### 阶段 I：端到端验收与文档收口
 
 | 任务编号 | 任务名称 | 状态 | 完成日期 | 备注 |
 |---------|---------|------|---------|------|
-| I1 | E2E：MCP Client 侧调用模拟 | [ ] | | |
-| I2 | E2E：Dashboard 冒烟测试 | [ ] | | |
-| I3 | 完善 README（运行说明 + MCP + Dashboard） | [ ] | | |
-| I4 | 清理接口一致性（契约测试补齐） | [ ] | | |
-| I5 | 全链路 E2E 验收 | [ ] | | |
+| I1 | E2E：MCP Client 侧调用模拟 | [x] | 2026-04-27 | test_mcp_client.py：子进程 MCP server + JSON-RPC initialize/tools/list/tools/call |
+| I2 | E2E：Dashboard 冒烟测试 | [x] | 2026-04-27 | test_dashboard_smoke.py：6 页面 Streamlit AppTest 冒烟 |
+| I3 | 完善 README（运行说明 + MCP + Dashboard） | [x] | 2026-04-27 | 配置说明 + MCP 配置示例 + Dashboard 指南 + 测试命令 |
+| I4 | 清理接口一致性（契约测试补齐） | [x] | 2026-04-27 | FakeVectorStore 补齐 delete/get_by_metadata + 7 个新契约测试 |
+| I5 | 全链路 E2E 验收 | [x] | 2026-04-27 | 314 passed / 5 skipped，全链路验收通过 |
 
 ---
 
@@ -2069,14 +2069,14 @@ dashboard:
 |------|---------|--------|------|
 | 阶段 A | 3 | 3 | 100% |
 | 阶段 B | 16 | 12 | 75% |
-| 阶段 C | 15 | 0 | 0% |
-| 阶段 D | 7 | 0 | 0% |
-| 阶段 E | 6 | 0 | 0% |
-| 阶段 F | 5 | 0 | 0% |
-| 阶段 G | 6 | 0 | 0% |
-| 阶段 H | 5 | 0 | 0% |
-| 阶段 I | 5 | 0 | 0% |
-| **总计** | **68** | **15** | **22%** |
+| 阶段 C | 15 | 15 | 100% |
+| 阶段 D | 7 | 7 | 100% |
+| 阶段 E | 6 | 6 | 100% |
+| 阶段 F | 5 | 5 | 100% |
+| 阶段 G | 6 | 6 | 100% |
+| 阶段 H | 5 | 5 | 100% |
+| 阶段 I | 5 | 5 | 100% |
+| **总计** | **68** | **68** | **100%** |
 
 
 ---

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(PYTHONPATH=src python -c \"from observability.dashboard.services.config_service import ConfigService; print\\('config_service OK'\\); from core.settings import load_settings; s = load_settings\\(\\); cfg = ConfigService\\(s\\); print\\('cards:', len\\(cfg.get_component_cards\\(\\)\\)\\)\")",
+      "Bash(PYTHONPATH=src python -c \"from ingestion.document_manager import DocumentManager, DocumentInfo, DeleteResult, CollectionStats; print\\('DocumentManager imported OK'\\)\")",
+      "Bash(PYTHONPATH=src python -m pytest tests/unit/test_document_manager.py -q)"
+    ]
+  }
+}

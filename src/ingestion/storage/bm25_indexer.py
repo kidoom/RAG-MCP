@@ -87,6 +87,36 @@ class BM25Indexer:
             json.dumps(payload, ensure_ascii=False, sort_keys=True), encoding="utf-8"
         )
 
+    def remove_document(self, chunk_id: str) -> bool:
+        """Remove a single document by chunk_id from the index.
+
+        Returns True if the document was found and removed, False otherwise.
+        """
+        norm_id = str(chunk_id).strip()
+        if not norm_id:
+            return False
+        if norm_id not in self._doc_terms:
+            return False
+        del self._doc_terms[norm_id]
+        self._doc_lengths.pop(norm_id, None)
+        self._recompute_index()
+        self.save()
+        return True
+
+    def remove_documents(self, chunk_ids: List[str]) -> int:
+        """Remove multiple documents by chunk_id. Returns count removed."""
+        removed = 0
+        for chunk_id in chunk_ids:
+            norm_id = str(chunk_id).strip()
+            if norm_id and norm_id in self._doc_terms:
+                del self._doc_terms[norm_id]
+                self._doc_lengths.pop(norm_id, None)
+                removed += 1
+        if removed > 0:
+            self._recompute_index()
+            self.save()
+        return removed
+
     def load(self) -> bool:
         if not self.index_path.exists():
             return False
@@ -178,9 +208,7 @@ class BM25Indexer:
 
     def _bm25_term_score(self, *, tf: float, doc_length: float, idf: float) -> float:
         denom = tf + self.k1 * (
-            1.0
-            - self.b
-            + self.b * (doc_length / max(self._avg_doc_length, 1e-9))
+            1.0 - self.b + self.b * (doc_length / max(self._avg_doc_length, 1e-9))
         )
         if denom <= 0:
             return 0.0
@@ -192,7 +220,9 @@ class BM25Indexer:
         terms_raw = sparse.get("terms", {})
         doc_length_raw = sparse.get("doc_length", 0)
         if not isinstance(terms_raw, dict):
-            raise ValueError(f"ChunkRecord[{record.id}] sparse_vector.terms must be a dict")
+            raise ValueError(
+                f"ChunkRecord[{record.id}] sparse_vector.terms must be a dict"
+            )
         terms: Dict[str, int] = {}
         for term, tf in terms_raw.items():
             term_norm = str(term).strip().lower()

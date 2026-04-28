@@ -5,13 +5,13 @@
 # LLM Configuration
 # =============================================================================
 llm:
-  provider: "gemini"
-  model: "gemini-2.0-flash"
+  provider: "deepseek"
+  model: "deepseek-v4-pro"
   deployment_name: ""
   azure_endpoint: ""
   api_version: ""
-  api_key: "AIzaSyAS_F7RqLmLLhPMC53BUBOxjkntJVJJe90"
-  base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  api_key: "sk-6e6bafb5175240c697b2362293fbfeba"
+  base_url: "https://api.deepseek.com/v1"
   temperature: 0.0
   max_tokens: 4096
 
@@ -25,7 +25,7 @@ embedding:
   azure_endpoint: ""
   deployment_name: ""
   api_version: ""
-  api_key: "sk-60f92b85b7cc4f79b98bae54e1cd51ab"
+  api_key: "sk-416f607352d3455890e82485e084bfea"
   base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
 # =============================================================================
@@ -33,13 +33,13 @@ embedding:
 # =============================================================================
 vision_llm:
   enabled: true
-  provider: "gemini"
-  model: "gemini-2.0-flash"
+  provider: "qwen"
+  model: "qwen-vl-max"
   azure_endpoint: ""
   deployment_name: ""
   api_version: ""
-  api_key: "AIzaSyAS_F7RqLmLLhPMC53BUBOxjkntJVJJe90"
-  base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  api_key: "sk-00281c08fe5148e0accb9ba22ae2f5da"
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
   max_image_size: 2048
 
 # =============================================================================
@@ -65,7 +65,7 @@ retrieval:
 rerank:
   enabled: true
   provider: "llm"
-  model: ""
+  model: "deepseek-v4-pro"
   top_k: 5
 
 # =============================================================================
@@ -97,8 +97,8 @@ ingestion:
   splitter: "recursive"
   batch_size: 100
   chunk_refiner:
-    use_llm: true
+    use_llm: false
   metadata_enricher:
-    use_llm: true
+    use_llm: false
   image_captioner:
-    use_vision_llm: true
+    use_vision_llm: false

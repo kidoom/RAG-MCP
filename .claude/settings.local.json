@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:api-docs.deepseek.com)",
+      "Bash(python -m pytest tests/unit/test_trace_context.py -v)",
+      "Bash(python -m pytest tests/unit/test_jsonl_logger.py -v)",
+      "Bash(python -m pytest tests/integration/test_hybrid_search.py tests/unit/test_reranker_fallback.py -v)",
+      "Bash(python -m pytest tests/unit/test_trace_context.py tests/unit/test_jsonl_logger.py tests/unit/test_pipeline_progress.py tests/integration/test_hybrid_search.py tests/unit/test_reranker_fallback.py tests/integration/test_ingestion_pipeline.py -v)",
+      "Bash(python -m pytest tests/ -v --ignore=tests/e2e --tb=short)",
+      "Read(//c/Users/86198/.claude/**)",
+      "Bash(PYTHONPATH=src .venv/Scripts/python.exe -m mcp_server.server --help)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(claude mcp *)",
+      "mcp__modular-rag__query_knowledge_hub",
+      "mcp__modular-rag__list_collections",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(curl -s http://localhost:8001/health)"
+    ]
+  },
+  "enableAllProjectMcpServers": true
+}

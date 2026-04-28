@@ -7,6 +7,7 @@ from typing import Dict, Set
 from .base_evaluator import BaseEvaluator, EvaluationInput
 
 
+# CustomEvaluator 类实现了轻量级的检索评估指标计算，包括命中率和平均倒数排名（MRR）。它继承自 BaseEvaluator 基类，并实现了 evaluate 方法。
 class CustomEvaluator(BaseEvaluator):
     """Compute lightweight retrieval metrics such as hit rate and MRR."""
 

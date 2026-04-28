@@ -7,6 +7,7 @@ for the RAG system.
 
 from .chunking import DocumentChunker
 from .embedding import BatchProcessor, DenseEncoder, SparseEncoder
+from .pipeline import IngestionPipeline, IngestionPipelineError, IngestionResult
 from .storage import BM25Indexer
 from .transform import BaseTransform, ChunkRefiner, ImageCaptioner, MetadataEnricher
 
@@ -16,6 +17,9 @@ __all__ = [
     "BatchProcessor",
     "DenseEncoder",
     "SparseEncoder",
+    "IngestionPipeline",
+    "IngestionPipelineError",
+    "IngestionResult",
     "BM25Indexer",
     "BaseTransform",
     "ChunkRefiner",

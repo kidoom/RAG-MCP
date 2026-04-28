@@ -6,6 +6,7 @@ from src.core.types import (
     Chunk,
     ChunkRecord,
     Document,
+    RetrievalResult,
     extract_image_ids_from_text,
     format_image_placeholder,
     to_json,
@@ -73,6 +74,20 @@ def test_chunk_record_vectors_roundtrip():
 
     minimal = ChunkRecord(id="r2", text="x", metadata={"source_path": "/p"})
     assert ChunkRecord.from_dict(minimal.to_dict()) == minimal
+
+
+def test_retrieval_result_roundtrip_and_json():
+    result = RetrievalResult(
+        chunk_id="chunk-1",
+        score=0.82,
+        text="retrieved context",
+        metadata={"collection": "default", "page": 2},
+    )
+    as_dict = result.to_dict()
+    assert as_dict["chunk_id"] == "chunk-1"
+    assert as_dict["metadata"]["page"] == 2
+    assert RetrievalResult.from_dict(as_dict) == result
+    json.loads(to_json(result))
 
 
 def test_validate_metadata_requires_source_path():

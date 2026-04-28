@@ -7,6 +7,22 @@ from typing import Dict, Type
 from .base_evaluator import BaseEvaluator, EvaluatorSettings
 from .custom_evaluator import CustomEvaluator
 
+# Lazy import for ragas evaluator to avoid hard dependency
+_RAGAS_REGISTERED = False
+
+
+def _register_ragas() -> None:
+    global _RAGAS_REGISTERED
+    if _RAGAS_REGISTERED:
+        return
+    try:
+        from observability.evaluation.ragas_evaluator import RagasEvaluator
+
+        EvaluatorFactory.register_provider("ragas", RagasEvaluator)
+        _RAGAS_REGISTERED = True
+    except ImportError:
+        pass
+
 
 class EvaluatorFactory:
     """Factory class for evaluator providers."""
@@ -19,6 +35,11 @@ class EvaluatorFactory:
     def create(cls, settings: EvaluatorSettings) -> BaseEvaluator:
         """Create an evaluator instance based on configured provider."""
         provider_name = settings.provider.lower()
+
+        # Auto-register ragas if requested
+        if provider_name == "ragas":
+            _register_ragas()
+
         provider_cls = cls._providers.get(provider_name)
 
         if not provider_cls:
