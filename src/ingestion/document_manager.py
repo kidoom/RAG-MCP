@@ -90,40 +90,50 @@ class DocumentManager:
         """List all ingested documents, optionally filtered by collection."""
         self._bm25.load()
 
-        # Gather unique source_paths from Chroma
         source_map: Dict[str, Dict[str, Any]] = {}
         collections = (
             [collection] if collection else self._chroma.get_all_collections()
         )
 
         for coll_name in collections:
-            # Query all records in this ChromaDB collection — metadata does not
-            # contain "collection", the ChromaDB collection itself is the namespace.
+            # Query the actual ChromaDB collection — ChromaStore is bound to a
+            # single default collection, so we must reach the PersistentClient.
             try:
-                results = self._chroma.get_by_metadata({})
+                chroma_coll = self._chroma._client.get_collection(name=coll_name)
+                response = chroma_coll.get(include=["documents", "metadatas"])
+                results: List[Dict[str, Any]] = [
+                    {
+                        "id": str(item_id),
+                        "text": text or "",
+                        "metadata": meta or {},
+                    }
+                    for item_id, text, meta in zip(
+                        response.get("ids") or [],
+                        response.get("documents") or [],
+                        response.get("metadatas") or [],
+                    )
+                ]
             except Exception:
-                results = []
+                continue
 
             seen_sources: Dict[str, int] = {}
             for r in results:
-                md = r.get("metadata", {})
-                sp = md.get("source_path", "")
+                sp = (r.get("metadata") or {}).get("source_path", "")
                 if sp:
                     seen_sources[sp] = seen_sources.get(sp, 0) + 1
 
+            # Pre-fetch all images for this collection once
+            try:
+                all_imgs = self._images.list_images(coll_name)
+            except Exception:
+                all_imgs = []
+
             for sp, chunk_count in seen_sources.items():
                 key = f"{coll_name}|{sp}"
-                img_count = len(self._images.list_images(coll_name, doc_hash=""))
-                # Count images for this specific doc
-                actual_img_count = 0
-                try:
-                    all_imgs = self._images.list_images(coll_name)
-                    actual_img_count = sum(
-                        1 for img in all_imgs
-                        if sp in str(img.get("file_path", ""))
-                    )
-                except Exception:
-                    pass
+                actual_img_count = sum(
+                    1 for img in all_imgs
+                    if sp in str(img.get("file_path", ""))
+                )
 
                 source_map[key] = {
                     "source_path": sp,
@@ -149,15 +159,38 @@ class DocumentManager:
         """Get full detail for a document by its doc_id or source_path."""
         coll_name = collection or load_settings().vector_store.collection_name
 
-        # Find chunks matching source_path or doc_id
+        # Query the correct ChromaDB collection, not the default binding
+        try:
+            chroma_coll = self._chroma._client.get_collection(name=coll_name)
+        except Exception:
+            return None
+
         # Try source_path in metadata
-        results = self._chroma.get_by_metadata({"source_path": doc_id})
+        response = chroma_coll.get(
+            where={"source_path": doc_id},
+            include=["documents", "metadatas"],
+        )
+        ids = response.get("ids") or []
+        docs = response.get("documents") or []
+        metas = response.get("metadatas") or []
+        results: List[Dict[str, Any]] = [
+            {"id": str(i), "text": d or "", "metadata": m or {}}
+            for i, d, m in zip(ids, docs, metas)
+        ]
+
         if not results:
-            # Try by ID prefix
-            try:
-                results = self._chroma.get_by_ids([doc_id])
-            except Exception:
-                results = []
+            # Try by ID prefix (via get)
+            response = chroma_coll.get(
+                ids=[doc_id],
+                include=["documents", "metadatas"],
+            )
+            ids2 = response.get("ids") or []
+            docs2 = response.get("documents") or []
+            metas2 = response.get("metadatas") or []
+            results = [
+                {"id": str(i), "text": d or "", "metadata": m or {}}
+                for i, d, m in zip(ids2, docs2, metas2)
+            ]
 
         if not results:
             return None
@@ -197,10 +230,15 @@ class DocumentManager:
         result = DeleteResult(source_path=source_path, success=False)
 
         try:
-            # 1. Delete from Chroma
-            result.chroma_deleted = self._chroma.delete_by_metadata(
-                {"source_path": source_path}
+            # 1. Delete from Chroma — use the correct collection
+            chroma_coll = self._chroma._client.get_collection(name=coll_name)
+            existing = chroma_coll.get(
+                where={"source_path": source_path}, include=[]
             )
+            ids_to_delete = existing.get("ids") or []
+            if ids_to_delete:
+                chroma_coll.delete(ids=ids_to_delete)
+            result.chroma_deleted = len(ids_to_delete)
         except Exception as exc:
             result.errors.append(f"Chroma: {exc}")
 
@@ -256,7 +294,12 @@ class DocumentManager:
         """Get aggregated statistics across all stores."""
         coll_name = collection or load_settings().vector_store.collection_name
 
-        chroma_stats = self._chroma.get_collection_stats()
+        # Query the correct ChromaDB collection, not the default binding
+        try:
+            chroma_coll = self._chroma._client.get_collection(name=coll_name)
+            chroma_count = chroma_coll.count()
+        except Exception:
+            chroma_count = 0
         self._bm25.load()
 
         import sqlite3
@@ -282,7 +325,7 @@ class DocumentManager:
 
         return CollectionStats(
             collection_name=coll_name,
-            chroma_entries=chroma_stats.get("entry_count", 0),
+            chroma_entries=chroma_count,
             bm25_documents=self._bm25.doc_count,
             images_stored=img_count,
             ingestion_records=ingestion_count,
