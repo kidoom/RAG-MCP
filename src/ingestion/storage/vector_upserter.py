@@ -53,15 +53,39 @@ class VectorUpserter:
         return hashlib.sha256(raw.encode("utf-8")).hexdigest() # 返回确定性的 chunk_id  
 
     def upsert(
-        self, records: List[ChunkRecord], trace: Optional[TraceContext] = None
+        self,
+        records: List[ChunkRecord],
+        *,
+        collection: Optional[str] = None,
+        trace: Optional[TraceContext] = None,
     ) -> List[ChunkRecord]:
-        """Convert ChunkRecord list to VectorRecord and upsert in order."""
+        """Convert ChunkRecord list to VectorRecord and upsert in order.
+
+        When *collection* differs from the settings default, a temporary store
+        is created so chunks land in the user-specified ChromaDB collection.
+        """
+        target_collection = (
+            collection.strip()
+            if isinstance(collection, str) and collection.strip()
+            else self._settings.vector_store.collection_name
+        )
+
+        if target_collection != self._settings.vector_store.collection_name:
+            store_settings = VectorStoreSettings(
+                provider=self._settings.vector_store.provider,
+                persist_directory=self._settings.vector_store.persist_directory,
+                collection_name=target_collection,
+            )
+            store = VectorStoreFactory.create(store_settings)
+        else:
+            store = self._vector_store
+
         if trace is not None:
             trace.record_stage(
                 "vector_upserter",
                 record_count=len(records),
                 provider=self._settings.vector_store.provider,
-                collection=self._settings.vector_store.collection_name,
+                collection=target_collection,
             )
 
         if not records:
@@ -69,7 +93,6 @@ class VectorUpserter:
 
         upsert_records: List[VectorRecord] = []
         output_records: List[ChunkRecord] = []
-        # 遍历每条记录，将稠密向量存储到向量数据库中，并生成确定性的 chunk_id 用于后续的检索
         for record in records:
             if not record.dense_vector:
                 raise ValueError(
@@ -93,5 +116,5 @@ class VectorUpserter:
                 )
             )
 
-        self._vector_store.upsert(upsert_records, trace=trace)
+        store.upsert(upsert_records, trace=trace)
         return output_records

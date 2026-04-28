@@ -22,6 +22,9 @@ class _FakeChromaStore:
 
     def __init__(self) -> None:
         self._records: List[Dict[str, Any]] = []
+        # _client exposes get_collection() so DocumentManager can query
+        # per-collection via the same API as the real ChromaStore.
+        self._client = _FakeChromaClient(self._records)
 
     def upsert(self, records, trace=None) -> None:
         for r in records:
@@ -59,6 +62,47 @@ class _FakeChromaStore:
 
     def get_all_collections(self) -> List[str]:
         return ["test", "other"]
+
+
+class _FakeChromaClient:
+    """Fake ChromaDB PersistentClient that returns FakeCollection per name."""
+
+    def __init__(self, records: List[Dict[str, Any]]):
+        self._records = records
+
+    def get_collection(self, name: str):
+        return _FakeCollection(self._records)
+
+
+class _FakeCollection:
+    """Fake ChromaDB Collection that returns records for .get() calls."""
+
+    def __init__(self, records: List[Dict[str, Any]]):
+        self._records = records
+
+    def get(self, *, ids=None, where=None, include=None):
+        matching = list(self._records)
+        if ids is not None:
+            matching = [r for r in matching if r["id"] in ids]
+        if where is not None:
+            matching = [
+                r for r in matching
+                if all(
+                    r.get("metadata", {}).get(k) == v
+                    for k, v in where.items()
+                )
+            ]
+        return {
+            "ids": [r["id"] for r in matching],
+            "documents": [r["text"] for r in matching],
+            "metadatas": [r["metadata"] for r in matching],
+        }
+
+    def count(self):
+        return len(self._records)
+
+    def delete(self, ids):
+        self._records = [r for r in self._records if r["id"] not in ids]
 
 
 class _FakeBM25:

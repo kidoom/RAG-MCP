@@ -142,7 +142,7 @@ class IngestionPipeline:
             _fire(on_progress, "encode", len(records), len(records))
 
             _fire(on_progress, "store", 0, len(records))
-            stored_records = self._stage_store(records, trace_ctx)
+            stored_records = self._stage_store(records, target_collection, trace_ctx)
             _fire(on_progress, "store", len(stored_records), len(stored_records))
 
             image_count = self._stage_store_images(document, target_collection, trace_ctx)
@@ -272,14 +272,21 @@ class IngestionPipeline:
         except Exception as exc:  # noqa: BLE001
             raise IngestionPipelineError(stage, "<in-memory>", str(exc)) from exc
 
-    def _stage_store(self, records: List[ChunkRecord], trace: TraceContext) -> List[ChunkRecord]:
+    def _stage_store(
+        self,
+        records: List[ChunkRecord],
+        collection: str,
+        trace: TraceContext,
+    ) -> List[ChunkRecord]:
         stage = "store"
         t0 = time.monotonic()
         try:
             # Upsert first so deterministic chunk_ids are computed (VectorUpserter
             # owns the canonical id generation per C12).  Pass the returned records
             # with stable ids to BM25 so both stores share the same chunk_id space.
-            upserted = self._vector_upserter.upsert(records, trace=trace)
+            upserted = self._vector_upserter.upsert(
+                records, collection=collection, trace=trace
+            )
             self._bm25_indexer.build(upserted, rebuild=False, persist=True)
             trace.record_stage(
                 stage,

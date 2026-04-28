@@ -116,11 +116,17 @@ class DocumentManager:
             except Exception:
                 continue
 
+            # Track source_path -> chunk_count and parent_doc_id
             seen_sources: Dict[str, int] = {}
+            doc_id_by_source: Dict[str, str] = {}
             for r in results:
-                sp = (r.get("metadata") or {}).get("source_path", "")
-                if sp:
-                    seen_sources[sp] = seen_sources.get(sp, 0) + 1
+                md = r.get("metadata") or {}
+                sp = md.get("source_path", "")
+                if not sp:
+                    continue
+                seen_sources[sp] = seen_sources.get(sp, 0) + 1
+                if sp not in doc_id_by_source:
+                    doc_id_by_source[sp] = md.get("parent_doc_id", "")
 
             # Pre-fetch all images for this collection once
             try:
@@ -130,9 +136,10 @@ class DocumentManager:
 
             for sp, chunk_count in seen_sources.items():
                 key = f"{coll_name}|{sp}"
+                doc_hash = doc_id_by_source.get(sp, "")
                 actual_img_count = sum(
                     1 for img in all_imgs
-                    if sp in str(img.get("file_path", ""))
+                    if doc_hash and img.get("doc_hash") == doc_hash
                 )
 
                 source_map[key] = {
@@ -201,10 +208,17 @@ class DocumentManager:
             if sp:
                 break
 
+        # Match images by parent_doc_id, not fragile substring
+        doc_hash = ""
+        for r in results:
+            doc_hash = (r.get("metadata") or {}).get("parent_doc_id", "")
+            if doc_hash:
+                break
+
         images = self._images.list_images(coll_name)
         matching_images = [
             img for img in images
-            if sp and sp in str(img.get("file_path", ""))
+            if doc_hash and img.get("doc_hash") == doc_hash
         ]
 
         integrity_record = None

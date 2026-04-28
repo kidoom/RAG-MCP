@@ -152,9 +152,11 @@ class _FakeBM25Indexer:
 class _FakeVectorUpserter:
     def __init__(self) -> None:
         self.calls = 0
+        self.last_collection: str = ""
 
-    def upsert(self, records: List[ChunkRecord], trace=None) -> List[ChunkRecord]:
+    def upsert(self, records: List[ChunkRecord], *, collection: Optional[str] = None, trace=None) -> List[ChunkRecord]:
         self.calls += 1
+        self.last_collection = collection or ""
         return records
 
 

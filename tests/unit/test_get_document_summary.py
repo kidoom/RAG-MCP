@@ -17,6 +17,9 @@ class _FakeVectorStore:
     def get_by_ids(self, _ids):
         return self.records
 
+    def get_by_metadata(self, filters):
+        return []
+
 
 @pytest.mark.unit
 def test_get_document_summary_returns_structured_payload(monkeypatch):
