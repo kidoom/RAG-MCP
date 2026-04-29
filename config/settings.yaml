@@ -10,7 +10,7 @@ llm:
   deployment_name: ""
   azure_endpoint: ""
   api_version: ""
-  api_key: "sk-6e6bafb5175240c697b2362293fbfeba"
+  api_key: "xxxx"
   base_url: "https://api.deepseek.com/v1"
   temperature: 0.0
   max_tokens: 4096
@@ -25,7 +25,7 @@ embedding:
   azure_endpoint: ""
   deployment_name: ""
   api_version: ""
-  api_key: "sk-416f607352d3455890e82485e084bfea"
+  api_key: "xxxx"
   base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
 # =============================================================================
@@ -38,7 +38,7 @@ vision_llm:
   azure_endpoint: ""
   deployment_name: ""
   api_version: ""
-  api_key: "sk-00281c08fe5148e0accb9ba22ae2f5da"
+  api_key: "xxxx"
   base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
   max_image_size: 2048
 

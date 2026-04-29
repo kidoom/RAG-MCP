@@ -104,4 +104,6 @@ traces.jsonl
 .env.local
 .env.*.local
 secrets.yaml
+API_KEYS.md
+config/settings.yaml
 nonexistent_traces.jsonl/
