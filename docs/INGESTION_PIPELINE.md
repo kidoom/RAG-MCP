@@ -10,87 +10,44 @@ IngestionPipeline 位于 **数据加工层**，向上承接文件上传入口，
 
 ```mermaid
 graph TD
-    subgraph 入口["　📥 文件上传入口　"]
+    subgraph 入口["Input"]
         direction LR
-        A1["📄 页面上传 PDF / TXT / MD"]
-        A2["💻 命令行批量导入目录"]
-        A3["🐍 Python API 调用"]
+        A1["Dashboard UI"]
+        A2["CLI scripts/ingest.py"]
+        A3["Python API: pipeline.run()"]
     end
 
     入口 --> S1
 
-    subgraph S1_["　"]
-        S1["<b>第一步</b><br/>文件校验<br/>──<br/>计算 SHA256 指纹<br/>查历史数据库<br/>判断是否重复"]
-    end
+    S1["<b>① Integrity</b><br/>SHA256(file) → file_hash<br/>SQLite: should_skip?<br/>重复 → skipped=True"]
+    S1 -->|"new"| S2
+    S1 -.->|"dup"| SKIP["Skipped"]
 
-    S1 -->|"首次上传"| S2
-    S1 -.->|"重复文件"| SKIP["⏭ 直接跳过<br/>返回成功"]
+    S2["<b>② Load</b><br/>PdfLoader → pypdf<br/>输出: <b>Document</b><br/>├─ id (SHA256)<br/>├─ text + [IMAGE:xxx]<br/>└─ metadata.images[]"]
+    S2 --> S3
 
-    subgraph S2_["　"]
-        S2["<b>第二步</b><br/>内容解析<br/>──<br/>pypdf 逐页提取文字<br/>图片插入占位标记<br/>组装为结构化文档"]
-    end
+    S3["<b>③ Split</b><br/>RecursiveCharacterSplitter<br/>chunk_size=1000 / overlap=200<br/>输出: List[<b>Chunk</b>]<br/>├─ id, text, metadata<br/>├─ chunk_index, source_ref<br/>└─ image_refs (按占位符分发)"]
+    S3 --> S4
 
-    S2 --> DOC["<b>📄 Document</b><br/>全文 + 120 张图片信息<br/>document_id = e5042c..."]
+    S4["<b>④ Transform</b><br/>ChunkRefiner → MetadataEnricher → ImageCaptioner<br/>输出: List[<b>Chunk</b>] (refined)<br/>├─ metadata.title<br/>├─ metadata.summary<br/>├─ metadata.tags<br/>└─ metadata.image_captions (optional)"]
+    S4 --> S5
 
-    subgraph S3_["　"]
-        S3["<b>第三步</b><br/>智能切片<br/>──<br/>按段落 → 行 → 空格逐级切<br/>每段 ≤ 1000 字 · 重叠 200 字<br/>生成确定性片段编号"]
-    end
+    S5["<b>⑤ Encode</b><br/>DenseEncoder + SparseEncoder → BatchProcessor<br/>输出: List[<b>ChunkRecord</b>]<br/>├─ id, text, metadata<br/>├─ dense_vector[1024]<br/>└─ sparse_vector{terms, doc_length}"]
+    S5 --> S6 & S7
 
-    DOC --> S3
+    S6["<b>⑥ Store</b><br/>VectorUpserter: build_chunk_id() → ChromaDB.upsert<br/>BM25Indexer: rebuild=False → index.json<br/>collection 苹果公司 → encode → x_e88b..."]
+    S7["<b>⑦ Image Store</b><br/>ImageStorage.save_image()<br/>→ data/images/苹果公司/<br/>→ image_index.db (ON CONFLICT)"]
 
-    S3 --> C{"<b>~72 个 Chunk</b><br/>每个含文本 + 元数据<br/>有图的 Chunk 绑定对应图片"}
+    S6 --> VEC[("ChromaDB<br/>x_e88bb9e69e9c...<br/>72 vectors")]
+    S6 --> BM25[("BM25<br/>index.json<br/>72 docs")]
+    S7 --> IMG[("Images/<br/>苹果公司/<br/>120 png")]
+    S7 --> IMGDB[("image_index.db<br/>120 rows")]
 
-    subgraph S4_["　"]
-        S4["<b>第四步</b><br/>信息增强<br/>──<br/>① 清洗格式噪音<br/>② 生成标题 / 摘要 / 标签<br/>③ 视觉 AI 理解图片（可选）"]
-    end
+    S6 & S7 --> S8
 
-    C --> S4
+    S8["<b>⑧ Finalize</b><br/>integrity.mark_success()<br/>trace.pipeline_done<br/>return <b>IngestionResult</b><br/>├─ skipped=False<br/>├─ doc_id<br/>├─ chunk_count=72<br/>├─ record_count=72<br/>└─ image_count=120"]
 
-    S4 --> C2["<b>72 个精炼 Chunk</b><br/>文本干净 · 有标题摘要 · 有标签"]
-
-    subgraph S5_["　"]
-        S5["<b>第五步</b><br/>向量编码<br/>──<br/>语义编码：文字 → 1024 维向量<br/>关键词统计：分词 + 词频<br/>两者按 ID 合并为一条记录"]
-    end
-
-    C2 --> S5
-
-    S5 --> REC["<b>72 条 ChunkRecord</b><br/>语义向量 · 关键词 · 原文"]
-
-    REC --> S6 & S7
-
-    subgraph S6_["　"]
-        S6["<b>第六步</b><br/>分类存储<br/>──<br/>存入语义向量库<br/>（集合名苹果公司 → 编码为 x_e88b...）<br/>构建关键词倒排索引"]
-    end
-
-    subgraph S7_["　"]
-        S7["<b>第七步</b><br/>图片归档<br/>──<br/>120 张图落盘<br/>目录：data/images/苹果公司/<br/>写入 SQLite 图片索引"]
-    end
-
-    S6 --> VEC[("　🗄️ ChromaDB 向量库<br/>x_e88bb9... 集合<br/>72 条向量记录　")]
-    S6 --> BM25[("　📇 BM25 关键词索引<br/>index.json<br/>72 条倒排索引　")]
-    S7 --> IMG[("　🖼️ 图片资源<br/>data/images/苹果公司/<br/>120 个 png 文件　")]
-    S7 --> IMGDB[("　🗃️ 图片索引<br/>image_index.db<br/>120 条记录　")]
-
-    VEC & BM25 --> S8
-    IMG & IMGDB --> S8
-
-    subgraph S8_["　"]
-        S8["<b>第八步</b><br/>完成标记<br/>──<br/>写入历史数据库<br/>记录成功状态<br/>返回处理结果"]
-    end
-
-    S8 --> RESULT["<b>✅ IngestionResult</b><br/>文件: Apple_..._2024.pdf<br/>状态: 成功 · 72 片段 · 120 图片"]
-
-    VEC --> 检索
-    BM25 --> 检索
-    IMGDB --> 检索
-
-    subgraph 检索["　🔍 检索服务消费　"]
-        direction LR
-        R1["语义搜索<br/>相似含义匹配"]
-        R2["关键词搜索<br/>精确词匹配"]
-        R3["混合搜索<br/>语义 + 关键词"]
-        R4["多模态回答<br/>引用图片"]
-    end
+    VEC & BM25 & IMGDB --> DL["D 层 Retrieval<br/>HybridSearch<br/>DenseRetriever + SparseRetriever<br/>→ Reranker → ResponseBuilder"]
 ```
 
 ### 1.2 示例：Apple 环境报告
@@ -102,42 +59,33 @@ graph TD
 | 文件规模 | 120 页，含 120 张图片 |
 | 处理结果 | 切分为 72 个文本片段，全部存入向量库和关键词索引 |
 
-### 1.3 流水线全貌
+### 1.3 数据流转总览
 
-```mermaid
-graph TD
-    A["上传 PDF 文件\n120 页 · 120 张图"]:::start
+| 阶段 | 输入 | 输出 | 关键操作 |
+|------|------|------|---------|
+| ① Integrity | `file_path` | `file_hash` | `SHA256()` → `should_skip()` |
+| ② Load | `file_path` | `Document` | `PdfLoader.load()` → `text` + `metadata.images[]` |
+| ③ Split | `Document` | `List[Chunk]` | `RecursiveSplitter` + `DocumentChunker` → 稳定 `chunk_id` |
+| ④ Transform | `List[Chunk]` | `List[Chunk]` | ChunkRefiner → MetadataEnricher → ImageCaptioner |
+| ⑤ Encode | `List[Chunk]` | `List[ChunkRecord]` | DenseEncoder + SparseEncoder → `dense_vector` + `sparse_vector` |
+| ⑥ Store | `List[ChunkRecord]` | ChromaDB + BM25 | `VectorUpserter.upsert()` + `BM25Indexer.build()` |
+| ⑦ Image | `Document.metadata.images[]` | disk + SQLite | `ImageStorage.save_image()` → `ON CONFLICT UPDATE` |
+| ⑧ Finalize | pipeline result | `IngestionResult` | `mark_success()` → `ingestion_history` |
 
-    B["第一步：文件校验\n计算文件指纹 · 判断是否重复\n首次上传 → 继续处理"]:::stage
-    C["第二步：内容解析\n提取文字 · 提取图片\n→ 得到原始文档"]:::stage
-    D["第三步：智能切片\n按段落/行/空格逐级切分\n→ 约 72 个文本片段"]:::stage
-    E["第四步：信息增强\n清洗格式 · 生成标题摘要\n→ 质量更高的片段"]:::stage
-    F["第五步：向量编码\n将文字转为数学向量\n→ 机器可理解的表示"]:::stage
-    G["第六步：分类存储\n语义向量库 + 关键词索引\n→ 可被搜索"]:::stage
-    H["第七步：图片归档\n图片落盘 · 建立索引\n→ 120 张图可被引用"]:::stage
-    I["第八步：完成标记\n记录处理状态\n下次同一文件自动跳过"]:::finish
-
-    A --> B --> C --> D --> E --> F --> G & H
-    G & H --> I
-
-    classDef start fill:#e1f5fe
-    classDef stage fill:#fff
-    classDef finish fill:#c8e6c9
-```
-
-### 1.4 处理后的产物
+### 1.4 存储产物
 
 ```
 data/
 ├── db/
-│   ├── chroma/              ← 语义向量（机器搜索用）
-│   ├── bm25/index.json      ← 关键词索引（关键词搜索用）
-│   ├── image_index.db        ← 图片索引（找图用）
-│   └── ingestion_history.db  ← 处理记录（避免重复处理）
+│   ├── chroma/                  ← ChromaDB: 向量集合 (collection = x_e88b...)
+│   ├── bm25/index.json          ← BM25Indexer: 倒排索引 {term: {idf, postings[]}}
+│   ├── image_index.db            ← ImageStorage: image_id PK, file_path, doc_hash, collection
+│   └── ingestion_history.db      ← IntegrityChecker: file_hash PK, file_path, status, processed_at
 ├── images/
-│   └── 苹果公司/             ← 图片原文件
+│   └── 苹果公司/                  ← 图片文件 (原始 collection 名)
+│       └── {image_id}.png
 └── logs/
-    └── traces.jsonl          ← 处理日志
+    └── traces.jsonl              ← TraceContext 追踪日志
 ```
 
 ### 1.5 重复处理防护（四层幂等）
@@ -146,183 +94,204 @@ data/
 
 ```mermaid
 graph LR
-    A["第一道防线\n文件指纹比对\n指纹相同 → 直接跳过"] --> B["第二道防线\n片段编号唯一\n同编号 → 覆盖不新增"]
-    B --> C["第三道防线\n图片编号唯一\n同编号 → 覆盖不重复"]
-    C --> D["第四道防线\n关键词增量更新\n同编号 → 替换旧数据"]
+    A["<b>Layer 1: file_integrity.py</b><br/>SHA256(file)<br/>→ ingestion_history.db<br/>should_skip() → True"] --> B["<b>Layer 2: vector_upserter.py</b><br/>build_chunk_id()<br/>SHA256(src|idx|content8)<br/>ChromaDB.upsert → UPDATE"]
+    B --> C["<b>Layer 3: image_storage.py</b><br/>image_id PRIMARY KEY<br/>ON CONFLICT DO UPDATE<br/>→ overwrite"]
+    C --> D["<b>Layer 4: bm25_indexer.py</b><br/>rebuild=False<br/>按 chunk_id 增量替换<br/>→ replace terms"]
 ```
 
-| 防线 | 判断依据 | 效果 |
-|------|---------|------|
-| 文件级 | SHA256 文件指纹 | 同文件不重复处理 |
-| 向量级 | 确定性片段编号 | 同片段覆盖写入 |
-| 图片级 | 图片唯一主键 | 同图片覆盖不重复 |
-| 关键词级 | 按片段编号增量 | 同编号替换旧词条 |
+| 层 | 文件 | 机制 | 效果 |
+|----|------|------|------|
+| 文件级 | file_integrity.py | `should_skip(file_hash)` 查 `ingestion_history.db` | 同文件跳过 pipeline |
+| 向量级 | vector_upserter.py | `build_chunk_id()` 确定性 + `ChromaDB.upsert` | 同 chunk_id → UPDATE |
+| 图片级 | image_storage.py | `image_id PK` + `ON CONFLICT DO UPDATE` | 同 image_id → 覆盖 |
+| BM25 级 | bm25_indexer.py | `rebuild=False` 按 `chunk_id` 覆盖 | 同 id → 替换词项 |
 
 ## 2. 分阶段详解
 
-### 2.1 第一步：文件校验
+### 2.1 ① Integrity — SHA256 文件校验
 
-拿到 PDF 后，先算一个"文件指纹"（SHA256），去数据库里查：这个文件处理过没？
+流程：计算文件指纹 → 查历史库 → 决定是否跳过。
 
 ```mermaid
 graph TD
-    A["收到 PDF 文件"] --> B["计算文件指纹\n类似给文件拍一张\n独一无二的数字照片"]
-    B --> C{"查历史记录\n这个指纹见过吗？"}
-    C -->|"见过且成功"| D["跳过处理\n直接返回"]
-    C -->|"没见过/之前失败"| E["进入下一步\n开始解析内容"]
+    A["file_path: Apple_..._2024.pdf"]
+    B["compute_sha256(file)\n→ file_hash = 'e5042c0e...'"]
+    C{"should_skip?<br/>SELECT status<br/>FROM ingestion_history<br/>WHERE file_hash = ?"}
+    D["跳过\nreturn IngestionResult(skipped=True)"]
+    E["继续\nreturn file_hash\n进入 Load"]
+
+    A --> B --> C
+    C -->|"status='success'"| D
+    C -->|"not found / force=True"| E
 ```
 
-**苹果文件**：首次上传，指纹不在历史中 → 继续。
+- 数据表：`ingestion_history(file_hash PK, file_path, status, processed_at, error_msg)`
+- `force=True` 可绕过跳过
+
+**苹果文件**：首次上传，hash 不在库中 → 继续。
 
 ---
 
-### 2.2 第二步：内容解析
+### 2.2 ② Load — PDF → Document
 
-把 PDF 变成程序能理解的格式。
+PdfLoader 调用 pypdf，逐页解析 PDF。
 
 ```mermaid
 graph TD
-    A["PDF 文件\n120 页"] --> B["逐页读取文字\n图片位置插入标记"]
-    A --> C["逐页提取图片\n保存为临时文件"]
-    B & C --> D["组装为结构化文档\n文字 + 图片标记 + 图片信息"]
-    D --> E["校验完整性\n确保必要字段齐全"]
+    PDF["PDF: 120 pages"] --> T & I
+
+    T["extract_text()\n逐页提取文字\n图片位置插 IMAGE:xxx 占位符"]
+    I["extract_images()\n逐页提取图片为临时文件\n失败仅 log warning"]
+    T & I --> V["validate_document_contract()\n校验 source_path, page_count"]
+
+    V --> DOC["<b>Document</b>\nid = 'e5042c0e...' (SHA256)\ntext + [IMAGE:xxx] 占位符\nmetadata.page_count = 120\nmetadata.images[] = 120 项\n  ├─ id: 'img_001'\n  ├─ path: 临时文件路径\n  ├─ page: 页码\n  └─ position: 文字偏移"]
 ```
 
-**产出**：一个结构化文档对象，包含：
-- 全文文本（图片处有 `[IMAGE: 编号]` 标记）
-- 120 张图片的信息（编号、位置、所在页码）
-
-**苹果文件**：120 页全部提取成功。
+**苹果文件**：120 页文字 + 120 张图 → 1 个 Document。
 
 ---
 
-### 2.3 第三步：智能切片
+### 2.3 ③ Split — Document → List[Chunk]
 
-一整本书太长，切成小段才好搜索。
+RecursiveCharacterSplitter 按 chunk_size=1000, overlap=200 切分，DocumentChunker 做适配。
 
 ```mermaid
 graph TD
-    A["完整文档\n一整本书"] --> B["按段落边界切分\n（优先用空行）"]
-    B --> C["还太长？按行切"]
-    C --> D["还太长？按句切"]
-    D --> E["每段不超过 1000 字\n段与段之间有 200 字重叠\n保证上下文不断裂"]
-    E --> F["每个片段做好标记\n来源文件 · 序号 · 包含的图片"]
+    DOC["Document"] --> SPLIT["RecursiveCharacterSplitter\nseparators: \\n\\n → \\n → ' ' → ''\n→ raw chunks"]
+
+    SPLIT --> A1["1. 稳定 chunk_id\n'{doc_id}_{idx:04d}_{content_hash[:8]}'"]
+    A1 --> A2["2. 继承 metadata\nsource_path, parent_doc_id, page_count"]
+    A2 --> A3["3. chunk_index 编号"]
+    A3 --> A4["4. source_ref = document.id"]
+    A4 --> A5["5. 图片引用分发\n扫描 text 中 [IMAGE:x]\n只将本 chunk 引用的图附到 metadata"]
+    A5 --> A6["6. 类型转换\nlibs.splitter.Chunk → core.types.Chunk"]
+
+    A6 --> CHUNKS["List[<b>Chunk</b>] × 72\n每个 Chunk:\n├─ id: 'e504..._0025_a1b2c3d4'\n├─ text: '...solar farms in...'\n├─ metadata.source_path\n├─ metadata.parent_doc_id\n├─ metadata.chunk_index\n├─ metadata.images[] (按需)\n├─ metadata.image_refs[]\n├─ start_offset / end_offset\n└─ source_ref"]
 ```
 
-**额外处理**：
-- 每个片段生成唯一编号，同一文件永远产生同样编号
-- 检测每个片段里有没有图片标记，有就把对应图片信息附上
-
-**苹果文件**：120 页 → 约 **72 个片段**。
+**苹果文件**：~72 个 Chunk，含图片占位符的 Chunk 绑定了对应 `metadata.images[]`。
 
 ---
 
-### 2.4 第四步：信息增强
+### 2.4 ④ Transform — ChunkRefiner → MetadataEnricher → ImageCaptioner
 
-原始切出来的片段比较粗糙，做三道加工。
+三次级联，每个遵循"规则兜底 + LLM 增强 + 降级标记"。
 
 ```mermaid
 graph TD
-    A["72 个原始片段"] --> B["第一道：清洗\n去掉格式噪音\n去掉页眉页脚\n规整换行空白"]
-    B --> C["第二道：充实\n提取标题\n生成摘要\n打上标签"]
-    C --> D["第三道：识图\n（可选）用视觉AI\n理解图片内容\n生成图片描述"]
-    D --> E["72 个精炼片段\n干净 · 有标题 · 有标签"]
+    IN["List[Chunk] × 72"] --> R
+
+    subgraph R["ChunkRefiner"]
+        R1["规则: strip HTML · 去页眉页脚\n合并空白 · \\r\\n→\\n"]
+        R2["LLM (可选): 调用 LLM 重写"]
+        R3["输出: metadata.refined_by = 'rule' | 'llm'"]
+    end
+
+    R --> E
+    subgraph E["MetadataEnricher"]
+        E1["规则: title=首行(120) · summary=首400字\ntags=regex[A-Z]+CJK序列"]
+        E2["LLM (可选): 语义生成 title/summary/tags"]
+        E3["输出: metadata.title · metadata.summary\nmetadata.tags[] · metadata.enriched_by"]
+    end
+
+    E --> C
+    subgraph C["ImageCaptioner"]
+        C1["有 LLM + 有 image_refs:\nVision LLM → image_captions"]
+        C2["无 LLM:\n保持 image_refs\nhas_unprocessed_images=True"]
+    end
+
+    C --> OUT["List[Chunk] × 72 (refined)\nmetadata 新增:\n├─ title, summary, tags\n├─ enriched_by, refined_by\n└─ image_captions (optional)"]
 ```
 
-**第一道 — 清洗**：
-- 去除 PDF 提取时产生的格式垃圾（HTML 标签、多余空白等）
-- 可选择调用大模型进一步润色（生产环境通常关闭）
-
-**第二道 — 充实**：
-- 标题：取片段第一行
-- 摘要：取片段前 400 字
-- 标签：自动提取关键词（如 `environmental`, `report`, `apple`）
-
-**第三道 — 识图**（可选）：
-- 如有图片且开启了视觉 AI，自动生成图片描述
-
-**苹果文件**：当前设置未开启 AI 增强，只做规则清洗和自动标签。
+**苹果文件**：`use_llm: false`，只走规则路径。
 
 ---
 
-### 2.5 第五步：向量编码
+### 2.5 ⑤ Encode — List[Chunk] → List[ChunkRecord]
 
-把人类文字转成数学向量，机器才能做语义搜索。
+BatchProcessor 将 Chunk 转为带向量的 ChunkRecord。
 
 ```mermaid
 graph TD
-    A["72 个精炼片段"] --> B["分批处理\n每 100 个一批"]
-    B --> C["语义编码\n将文字含义压缩为\n1024 个数字的向量"]
-    B --> D["关键词统计\n统计词频\n记录词出现次数"]
-    C & D --> E["合并为一个数据记录\n语义向量 + 关键词 + 原文"]
+    CHUNKS["List[Chunk] × 72"] --> BP
+
+    subgraph BP["BatchProcessor (batch_size=100)"]
+        SLICE["切片: 1 batch × 72"]
+        DENSE["DenseEncoder.encode(texts)\nQwen text-embedding-v3\n→ List[float] × 1024"]
+        SPARSE["SparseEncoder.encode(texts)\n分词+词频 → {terms, doc_length}"]
+        DENSE & SPARSE --> MERGE["按 id 合并 dense+sparse\n验证: ID 匹配 + 数量一致"]
+    end
+
+    MERGE --> REC["List[<b>ChunkRecord</b>] × 72\n├─ id, text, metadata\n├─ dense_vector[1024]\n└─ sparse_vector\n    ├─ terms: {'solar': 1, ...}\n    └─ doc_length"]
 ```
 
-**通俗理解**：语义向量就像一个"意义地图"，意思相近的句子在地图上挨得近。
-
-**苹果文件**：72 个片段 < 100 → 一批处理完。
+**苹果文件**：72 < 100 → 1 批处理完。
 
 ---
 
-### 2.6 第六步：分类存储
-
-将向量和关键词分别存入两个库。
+### 2.6 ⑥ Store — ChromaDB + BM25 双重持久化
 
 ```mermaid
 graph TD
-    A["72 条数据记录"] --> B["存语义向量\n到向量数据库\n（用集合名作为分类）"]
-    A --> C["建关键词索引\n到倒排索引文件\n（类似书的目录）"]
-    B --> D[("语义向量库\n72 条记录")]
-    C --> E[("关键词索引\n72 条记录")]
+    REC["List[ChunkRecord] × 72"] --> VS
+
+    subgraph VS["VectorUpserter"]
+        V1["encode_collection_name('苹果公司')\n→ 'x_e88bb9e69e9ce585ace58fb8'"]
+        V2["build_chunk_id(record)\nSHA256(source_path|chunk_index|content_hash8)\n→ 87e86dbe8545c200..."]
+        V3["ChromaDB.upsert(ids, embeddings, docs, metas)\n同 id UPDATE · 不同 id INSERT"]
+    end
+
+    VS --> CHROMA[("ChromaDB\nx_e88bb9e...\n72 vectors")]
+    VS -->|"带稳定 chunk_id"| BM
+
+    subgraph BM["BM25Indexer"]
+        B1["提取 sparse_vector.terms"]
+        B2["IDF: log((N-df+0.5)/(df+0.5))"]
+        B3["倒排索引: {term: {idf, postings[]}}"]
+        B4["persist → index.json"]
+    end
+
+    BM --> IDX[("BM25\nindex.json\n72 docs")]
+
+    CHROMA --> S8
+    IDX --> S8
 ```
 
-**关于"集合名"（Collection）**：
-
-用户上传时填的集合名（如 `苹果公司`）就是分类标签。由于向量数据库只支持英文命名，中文名会被自动编码：
-
-```
-用户填：苹果公司
-   ↓ 编码
-向量库存：x_e88bb9e69e9c...
-   ↓ 解码（显示时）
-页面显示：苹果公司
-```
-
-这个编解码过程对用户完全透明，页面始终显示中文名。
-
-**苹果文件**：72 条记录全部存入 `苹果公司` 分类。
+**VectorUpserter must run before BM25**: 前者是 chunk_id 的权威来源（C12），BM25 接收相同 ID 保持命名空间一致。
 
 ---
 
-### 2.7 第七步：图片归档
+### 2.7 ⑦ Image Store — 图片独立落盘
 
-图片单独存储，不跟文本混在一起。
+图片是文档级资源，独立于 Chunk 存储。
 
 ```mermaid
 graph TD
-    A["120 张待归档图片"] --> B["逐张处理\n读临时文件"]
-    B --> C["复制到图片目录\n按集合名分类存放"]
-    B --> D["写入图片索引\n记录：编号 · 路径 · 所属文档 · 页码"]
-    C --> E[("data/images/苹果公司/\n120 个图片文件")]
-    D --> F[("image_index.db\n120 条索引")]
+    IMGS["Document.metadata.images[] × 120"] --> LOOP["for image in images:"]
+    LOOP --> READ["读取临时文件 bytes"]
+    READ --> SAVE["落盘: data/images/苹果公司/{image_id}.png"]
+    READ --> UPSERT["SQLite upsert\nINSERT INTO image_index\n  (image_id PK, file_path, collection,\n   doc_hash, page_num, created_at)\nON CONFLICT(image_id) DO UPDATE"]
+
+    SAVE --> DISK[("data/images/苹果公司/\n120 png")]
+    UPSERT --> SQL[("image_index.db\n120 rows\n索引: idx_collection, idx_doc_hash")]
 ```
 
-**为什么分开存**：一个图片可能被多个片段引用，分开管理更方便删除和迁移。
-
-**苹果文件**：120 张图全部归档。
+**苹果文件**：120 张图落盘 + 120 条 SQLite。
 
 ---
 
-### 2.8 第八步：完成标记
-
-记录处理结果，确保下次不重复劳动。
+### 2.8 ⑧ Finalize — 标记完成
 
 ```mermaid
 graph TD
-    A{"处理结果？"}
-    A -->|"全部成功"| B["记录成功\n写入历史数据库\n文件指纹 + 成功状态"]
-    A -->|"任何环节出错"| C["记录失败\n写入历史数据库\n文件指纹 + 失败状态"]
-    B --> D["返回结果摘要\n72 个片段 · 120 张图片 · 处理成功"]
-    C --> E["抛出错误\n标明失败环节\n下次可重试"]
+    RESULT{"success?"}
+
+    RESULT -->|"yes"| S1["integrity.mark_success(\n  file_hash, file_path,\n  'doc_id=...;chunks=72;records=72')"]
+    S1 --> S2["trace.record_stage('pipeline_done')"]
+    S2 --> S3["return <b>IngestionResult</b>\n├─ file_path\n├─ file_hash\n├─ skipped=False\n├─ doc_id\n├─ chunk_count=72\n├─ record_count=72\n└─ image_count=120"]
+
+    RESULT -->|"exception"| F1["integrity.mark_failed(\n  file_hash, file_path, error)"]
+    F1 --> F2["raise <b>IngestionPipelineError</b>\n├─ stage: 失败阶段名\n├─ file_path\n└─ message"]
 ```
 
 **成功处理结果**：
@@ -371,7 +340,13 @@ from core.settings import load_settings
 
 pipeline = IngestionPipeline(load_settings())
 result = pipeline.run("file.pdf", collection="my_collection")
-print(f"片段: {result.chunk_count}, 图片: {result.image_count}")
+
+# → IngestionResult:
+#   result.skipped       # bool
+#   result.doc_id        # Document.id (SHA256)
+#   result.chunk_count   # len(List[Chunk])
+#   result.record_count  # len(List[ChunkRecord])
+#   result.image_count   # len(metadata.images[])
 ```
 
 ---
