@@ -1,0 +1,1795 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modular RAG — 架构可视化</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="/vendor/cytoscape.min.js"></script>
+<script src="/vendor/dagre.min.js"></script>
+<script src="/vendor/cytoscape-dagre.js"></script>
+<script src="/vendor/mermaid.min.js"></script>
+<style>
+:root {
+  --bg-deep: #0b0f14;
+  --bg-panel: #111921;
+  --bg-card: #161f2c;
+  --bg-hover: #1c2736;
+  --border: #2a3544;
+  --text: #e8eef7;
+  --text-muted: #8b9bb4;
+  --accent: #38bdf8;
+  --accent-dim: rgba(56, 189, 248, 0.14);
+  --sidebar-w: 268px;
+  --inspector-w: 400px;
+  --rail-w: 272px;
+  --radius: 10px;
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --font-sans: "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --z-overlay: 20;
+  --focus: #7dd3fc;
+  /* Layout rhythm */
+  --page-pad: 24px;
+  --readable-max: 1120px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-deep);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
+  line-height: 1.55;
+  font-size: 15px;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Sidebar */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.brand {
+  padding: 22px 20px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand-mark {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.brand-title {
+  font-weight: 700;
+  font-size: 17px;
+  margin-top: 6px;
+  letter-spacing: -0.02em;
+}
+
+.brand-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.45;
+}
+
+.nav-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 20px 20px 8px;
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: calc(100% - 20px);
+  margin: 0 10px;
+  padding: 11px 18px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.nav-btn svg { flex-shrink: 0; opacity: 0.85; }
+
+.nav-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.nav-btn.active {
+  background: var(--accent-dim);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: var(--text);
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 20px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  line-height: 1.5;
+}
+
+/* Main column */
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.topbar {
+  flex-shrink: 0;
+  min-height: 56px;
+  padding: 10px var(--page-pad);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(17, 25, 33, 0.92);
+  backdrop-filter: blur(10px);
+}
+
+.topbar-titles {
+  min-width: 0;
+  flex: 1;
+}
+
+.view-heading {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+}
+
+.view-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.5;
+  max-width: 52rem;
+}
+
+.live-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.45);
+}
+
+.status-dot.warn {
+  background: #fbbf24;
+  box-shadow: none;
+}
+
+.status-dot.off {
+  background: #f87171;
+  box-shadow: none;
+}
+
+.main-scroll {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.main-scroll > .view-section {
+  padding-inline: var(--page-pad);
+}
+
+/* 大图区分两侧撑满主栏（抵消 section 的 padding-inline） */
+.graph-view-inner > .workspace-split,
+.graph-view-inner > .pipeline-split {
+  margin-inline: calc(-1 * var(--page-pad));
+  width: calc(100% + 2 * var(--page-pad));
+}
+
+/* RAG 流程：外扩整个工作台；勿对嵌套的 pipeline-split 再负边距，否则在 grid 列内会撑破布局 */
+#view-pipeline .graph-view-inner > .pipeline-work-zone {
+  margin-inline: calc(-1 * var(--page-pad));
+  width: calc(100% + 2 * var(--page-pad));
+}
+
+.view-section {
+  display: none;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.view-section.active {
+  display: flex;
+}
+
+/* Overview */
+.bento {
+  padding-block: 28px;
+  padding-inline: 0;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  width: 100%;
+  max-width: var(--readable-max);
+  margin-inline: auto;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+  box-shadow: var(--shadow);
+}
+
+.card h2 {
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 12px;
+}
+
+.card p, .card li {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.card p strong { color: var(--text); }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px 20px;
+  align-items: start;
+}
+
+.stat-val {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pkg-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pkg-pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.pkg-pill:hover { border-color: var(--accent); }
+
+.jump-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.jump-btn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.jump-btn:hover {
+  background: var(--accent-dim);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+/* Graph workspace */
+.graph-view-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.intro-strip {
+  flex-shrink: 0;
+  padding: 14px var(--page-pad);
+  font-size: 13px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+
+.intro-strip code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.intro-inner {
+  max-width: var(--readable-max);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.intro-strip--compact {
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.workspace-split {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+}
+
+.pipeline-split {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+}
+
+.step-rail {
+  width: var(--rail-w);
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--bg-panel);
+  overflow-y: auto;
+}
+
+.step-rail h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 14px 18px 10px;
+}
+
+.step-item {
+  padding: 12px 18px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.step-item:hover { background: var(--bg-hover); }
+
+.step-item.active {
+  background: var(--accent-dim);
+  border-left-color: var(--accent);
+}
+
+.step-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.step-mod {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 4px;
+  word-break: break-all;
+}
+
+.step-snippet {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.graph-panel {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: #0e141b;
+}
+
+.cy-root {
+  position: absolute;
+  inset: 0;
+}
+
+.graph-toolbar {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  z-index: var(--z-overlay);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.toolbar-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.module-pkg-select {
+  min-width: 168px;
+  max-width: min(220px, 36vw);
+  flex: 0 1 auto;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b9bb4' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+
+.toolbar-mini-btn {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.toolbar-mini-btn:hover {
+  background: var(--accent-dim);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: var(--text);
+}
+
+.search-input {
+  width: 260px;
+  max-width: 42vw;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.search-input::placeholder { color: var(--text-muted); }
+
+.flow-toggle {
+  display: flex;
+  gap: 6px;
+}
+
+.flow-toggle button {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.flow-toggle button.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.legend {
+  position: absolute;
+  bottom: 14px;
+  left: 16px;
+  z-index: var(--z-overlay);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(22, 31, 44, 0.92);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-width: min(560px, 90vw);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-muted);
+  user-select: none;
+  transition: opacity 0.15s ease;
+}
+
+.legend-item.dimmed { opacity: 0.38; }
+
+.legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.inspector {
+  width: var(--inspector-w);
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--bg-panel);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.inspector-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.inspector-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.inspector-body h4 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  margin: 18px 0 8px;
+}
+
+.inspector-body h4:first-child { margin-top: 0; }
+
+.inspector-body code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg-deep);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.pill {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  margin: 2px 4px 2px 0;
+}
+
+.tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+.class-block {
+  margin-top: 10px;
+  padding: 12px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+/* MCP view */
+.mcp-grid {
+  padding: 20px 0 32px;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  width: 100%;
+  max-width: var(--readable-max);
+  margin-inline: auto;
+}
+
+.proto-banner {
+  margin: 24px auto 0;
+  padding: 18px 22px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: var(--readable-max);
+}
+
+.proto-banner h2 {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+
+.proto-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.proto-row strong { color: var(--text); }
+
+.rpc-list {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.rpc-item {
+  font-size: 13px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.rpc-item:last-child { border-bottom: none; }
+
+.rpc-method {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.tool-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.tool-card h3 {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tool-card .handler {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  font-family: var(--font-mono);
+}
+
+.tool-card p.desc {
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.schema-pre {
+  margin-top: 14px;
+  padding: 14px;
+  background: var(--bg-deep);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #cbd5e1;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+#errBox {
+  display: none;
+  position: fixed;
+  top: 72px;
+  right: 20px;
+  z-index: 9999;
+  max-width: 420px;
+  padding: 14px 18px;
+  background: #3f1f23;
+  border: 1px solid #b91c1c;
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: #fecaca;
+  box-shadow: var(--shadow);
+}
+
+.spec-reading {
+  padding: 16px var(--page-pad) 12px;
+  max-width: var(--readable-max);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.spec-reading .spec-h {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.spec-reading ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.spec-reading li { margin-bottom: 6px; }
+
+.spec-reading li strong { color: var(--text); font-weight: 600; }
+
+.flow-demo-panel {
+  margin: 0 auto 18px;
+  padding: 18px 20px 20px;
+  width: 100%;
+  max-width: var(--readable-max);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* RAG 流程：页头与示意面板不要被 flex 挤压；下方工作台吃满剩余高度 */
+#view-pipeline .pipeline-page-head {
+  flex-shrink: 0;
+}
+
+#view-pipeline .flow-demo-panel {
+  flex-shrink: 0;
+}
+
+.flow-demo-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.flow-demo-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.flow-demo-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.anim-btn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.anim-btn:hover:not(:disabled) {
+  background: var(--accent-dim);
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.anim-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.flow-phase-caption {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  min-height: 3.15em;
+}
+
+.flow-phase-caption .phase-name {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent);
+  margin-right: 8px;
+}
+
+.schematic-wrap {
+  overflow-x: visible;
+  overflow-y: visible;
+  padding-bottom: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.flow-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* RAG 流程「阶段示意」竖向栈：与同页步骤列表、拓扑图纵向阅读一致 */
+.flow-svg.flow-svg--vertical {
+  min-width: 0;
+  max-width: 280px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.flow-svg--vertical .ph-label-second {
+  font-size: 10px;
+}
+
+.flow-svg .ph-box { cursor: pointer; outline: none; }
+.flow-svg .ph-box:focus-visible rect {
+  stroke: var(--focus);
+}
+
+.flow-svg .ph-box rect {
+  transition: stroke 0.22s ease, fill 0.22s ease;
+}
+
+.flow-svg .ph-box.is-active rect {
+  stroke: #38bdf8;
+  stroke-width: 2.5px;
+  fill: #1a3d52;
+}
+
+.flow-svg .ph-label {
+  fill: #cbd5e1;
+  font-size: 11px;
+  font-family: "IBM Plex Sans", sans-serif;
+  pointer-events: none;
+}
+
+.flow-svg .ph-sub {
+  fill: #94a3b8;
+  font-size: 9px;
+  font-family: "IBM Plex Sans", sans-serif;
+  pointer-events: none;
+}
+
+.flow-svg .flow-connector {
+  stroke: #334155;
+  stroke-width: 2;
+  fill: none;
+  marker-end: url(#arrowhead);
+  transition: stroke 0.25s ease;
+}
+
+.flow-svg .flow-connector.is-lit {
+  stroke: #38bdf8;
+  stroke-dasharray: 8 6;
+  animation: dash-move 1.1s linear infinite;
+}
+
+@keyframes dash-move {
+  to { stroke-dashoffset: -28; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-svg .flow-connector.is-lit {
+    animation: none;
+    stroke-dasharray: none;
+  }
+}
+
+.inspector-body.prose {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.inspector-body.prose p { margin-bottom: 12px; }
+
+.inspector-body.prose ul {
+  margin: 8px 0 12px 1.2rem;
+}
+
+.inspector-body.prose li { margin-bottom: 6px; }
+
+.inspector-body.prose .phase-lead {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text);
+}
+
+.pipeline-reading-hint {
+  margin: 0;
+  padding: 14px 18px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  max-width: var(--readable-max);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.pipeline-reading-hint strong { color: var(--text); }
+
+.pipeline-spec-details {
+  max-width: var(--readable-max);
+  margin: 0 auto;
+  padding: 0 var(--page-pad) 12px;
+}
+
+.pipeline-spec-summary {
+  cursor: pointer;
+  padding: 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.pipeline-spec-sum-hint {
+  font-weight: 500;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.pipeline-spec-details[open] .pipeline-spec-sum-hint { display: none; }
+
+.pipeline-intro-condensed { margin-bottom: 10px; }
+
+.pipeline-work-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+@media (min-width: 1180px) {
+  .pipeline-work-zone {
+    display: grid;
+    grid-template-columns: minmax(280px, 36%) minmax(0, 1fr);
+    grid-template-rows: 1fr;
+    gap: 16px;
+    align-items: stretch;
+    padding-top: 4px;
+  }
+
+  #view-pipeline .flow-demo-panel {
+    margin-bottom: 0 !important;
+    margin-left: auto;
+    margin-right: auto;
+    max-width: none;
+    width: 100%;
+    align-self: start;
+    max-height: min(calc(100vh - 140px), 900px);
+    overflow-y: auto;
+    position: sticky;
+    top: 8px;
+  }
+
+  #view-pipeline .pipeline-work-zone > .pipeline-split {
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+  }
+}
+
+.flow-kbd-hint {
+  margin: -4px 0 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.flow-kbd-hint kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-deep);
+}
+
+.step-phase-chip {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 1.35;
+}
+
+.flow-svg text.ph-range {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: #94a3b8;
+}
+
+.step-item:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+#pipelineFlowKbRegion:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
+.insp-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 12px;
+  margin-bottom: 12px;
+  background: rgba(15, 22, 30, 0.35);
+}
+
+.insp-block > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 10px 4px;
+  color: var(--text);
+}
+
+.inspector-body.prose .insp-block--phase .phase-lead {
+  padding: 0 4px 12px;
+  margin-top: -4px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text);
+}
+
+.phase-mod-list {
+  margin: 0;
+  padding: 0 4px 12px 1.25rem;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.phase-mod-list .rail-step-n {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  margin-left: 6px;
+}
+
+.muted-inline { opacity: 0.88; }
+
+.step-insp-phase {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+.step-insp-phase strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.insp-path code,
+.insp-code {
+  word-break: break-all;
+}
+
+.pre-doc {
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.65;
+  margin: 0 0 12px;
+}
+
+.pipeline-page-head {
+  background: rgba(17, 25, 33, 0.5);
+}
+
+.retrieval-overview-page {
+  max-width: var(--readable-max);
+  margin: 0 auto;
+  padding: 18px var(--page-pad) 48px;
+}
+
+.retrieval-intro-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.retrieval-intro-actions .jump-btn {
+  margin-top: 0;
+}
+
+.aspect-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+
+.aspect-section-lead {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.62;
+  max-width: 48rem;
+  margin-bottom: 4px;
+}
+
+.aspects-intro {
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.retrieval-aspects-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
+  margin-top: 16px;
+}
+
+.aspect-card {
+  background: rgba(22, 31, 42, 0.55);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin: 0;
+}
+
+.aspect-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 10px;
+  line-height: 1.35;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+  justify-content: space-between;
+}
+
+.aspect-phase-ref {
+  font-size: 12px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.aspect-caption {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.58;
+  margin: 0 0 14px;
+}
+
+.aspect-step {
+  margin-top: 10px;
+  padding: 10px 12px 10px 14px;
+  background: rgba(11, 16, 23, 0.45);
+  border-radius: 8px;
+  border-left: 3px solid var(--accent);
+}
+
+.aspect-step:first-of-type {
+  margin-top: 0;
+}
+
+.aspect-step code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.aspect-path {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  word-break: break-all;
+}
+
+.aspect-doc {
+  font-size: 12px;
+  color: rgba(226, 232, 240, 0.88);
+  margin: 8px 0 0;
+  line-height: 1.48;
+}
+
+.aspect-dev-ref {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.dev-spec-anchor {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.dev-spec-anchor:hover {
+  border-bottom-color: var(--accent);
+}
+
+.dev-spec-anchor--disabled {
+  color: var(--text-muted);
+  border-bottom-style: dashed;
+  border-bottom-width: 1px;
+  border-bottom-color: rgba(139, 155, 180, 0.45);
+  cursor: help;
+}
+
+.diagram-block.retrieval-top-diagram {
+  margin-top: 14px;
+}
+
+.diagram-block {
+  margin-top: 24px;
+  border-radius: calc(var(--radius) + 2px);
+  padding: 0;
+  border: 1px solid rgba(56, 189, 248, 0.12);
+  background: linear-gradient(165deg, rgba(22, 31, 44, 0.98) 0%, rgba(15, 21, 30, 0.92) 100%);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+
+.diagram-surface--arch {
+  border-color: rgba(56, 189, 248, 0.22);
+  box-shadow: var(--shadow), 0 0 0 1px rgba(56, 189, 248, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.diagram-block-head {
+  padding: 16px 20px 0;
+}
+
+.diagram-block-head h3 {
+  font-family: var(--font-sans);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  text-transform: none;
+  margin-bottom: 6px;
+}
+
+.diagram-block-lead {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.62;
+  max-width: 56rem;
+  margin-bottom: 4px;
+}
+
+.diagram-block-lead strong {
+  color: rgba(226, 232, 240, 0.95);
+  font-weight: 600;
+}
+
+.mermaid-host--polish {
+  margin: 12px 16px 18px;
+  padding: 16px 12px;
+  border-radius: 10px;
+  background: radial-gradient(120% 80% at 10% -20%, rgba(56, 189, 248, 0.08), transparent),
+    rgba(11, 16, 23, 0.55);
+  border: 1px solid rgba(42, 53, 68, 0.85);
+}
+
+.mermaid-host {
+  overflow-x: auto;
+  min-height: 48px;
+}
+
+.mermaid-host svg,
+.mermaid-host--polish svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.mermaid-host--polish svg {
+  filter: drop-shadow(0 2px 14px rgba(0, 0, 0, 0.35));
+}
+
+.mermaid-fallback {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 12px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.diagram-empty, .diagram-err {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 14px;
+}
+
+.diagram-hover-tip {
+  position: fixed;
+  left: -9999px;
+  top: -9999px;
+  z-index: 10000;
+  max-width: min(360px, calc(100vw - 24px));
+  padding: 11px 14px;
+  font-size: 13px;
+  line-height: 1.52;
+  color: var(--text);
+  background: rgba(21, 30, 40, 0.97);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: calc(var(--radius) - 2px);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.14s ease, visibility 0.14s ease;
+}
+
+.diagram-hover-tip.is-visible {
+  visibility: visible;
+  opacity: 1;
+}
+
+.diagram-hover-tip-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: rgba(226, 232, 240, 0.98);
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+
+.diagram-hover-tip-body {
+  color: rgba(216, 224, 235, 0.92);
+  font-size: 12.5px;
+}
+
+.diagram-hover-tip-body p + p {
+  margin-top: 8px;
+}
+
+.diagram-err {
+  color: #fbbf24;
+  margin-top: 8px;
+}
+
+.scenario-outer .graph-view-inner {
+  padding-bottom: 32px;
+}
+
+.scenario-page {
+  max-width: var(--readable-max);
+  margin: 0 auto;
+  padding: 16px 0 40px;
+}
+
+.scenario-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.scenario-subtab {
+  padding: 9px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: rgba(22, 31, 44, 0.6);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.scenario-subtab:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.scenario-subtab.active {
+  background: var(--accent-dim);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: var(--text);
+}
+
+.scenario-panel {
+  display: none;
+}
+
+.scenario-panel.active {
+  display: block;
+}
+
+.scenario-panel-lead {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.65;
+  max-width: 52rem;
+  margin-bottom: 8px;
+}
+
+.scenario-type-notes {
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: rgba(11, 16, 23, 0.45);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+.scenario-type-notes strong {
+  color: rgba(241, 245, 249, 0.95);
+  font-weight: 600;
+}
+
+.scenario-type-notes code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.scenario-type-notes ul {
+  margin: 10px 0 0;
+  padding-left: 1.25rem;
+}
+
+.scenario-type-notes li {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 1024px) {
+  body { flex-direction: column; }
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { border-bottom: none; flex: 1; min-width: 200px; }
+  nav { display: flex; flex-wrap: wrap; flex: 2; padding: 8px; }
+  .nav-group-label { display: none; }
+  .nav-btn { width: auto; margin: 4px; }
+  .sidebar-footer { width: 100%; }
+  .workspace-split { flex-direction: column; }
+  .pipeline-split { flex-direction: column; }
+  .pipeline-work-zone { display: flex; flex-direction: column; }
+  #view-pipeline .flow-demo-panel {
+    position: relative !important;
+    top: auto !important;
+    max-height: none !important;
+    margin-left: 0 !important;
+  }
+  .graph-view-inner > .workspace-split,
+  .graph-view-inner > .pipeline-split,
+  #view-pipeline .graph-view-inner > .pipeline-work-zone {
+    margin-inline: 0;
+    width: 100%;
+  }
+  .inspector { width: 100%; border-left: none; border-top: 1px solid var(--border); max-height: 42vh; }
+  .step-rail { width: 100%; border-right: none; border-bottom: 1px solid var(--border); max-height: 200px; }
+}
+</style>
+</head>
+<body>
+
+<aside class="sidebar" aria-label="主导航">
+  <div class="brand">
+    <div class="brand-mark">Architecture Lab</div>
+    <div class="brand-title">Modular RAG Explorer</div>
+    <div class="brand-sub">RAG 检索 · 场景流程 · RAG 管线 · MCP</div>
+  </div>
+  <div class="nav-group-label">视图</div>
+  <nav>
+    <button type="button" class="nav-btn active" data-view="overview" aria-current="page">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16M4 19l4-6 4 3 5-8 5 5"/><path d="M9 13l3-3 3 2"/></svg>
+      总览
+    </button>
+    <button type="button" class="nav-btn" data-view="modules">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M12 8v4M8 16l-2-4M16 16l2-4"/></svg>
+      RAG 检索
+    </button>
+    <button type="button" class="nav-btn" data-view="pipeline">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h4l2-6 4 12 2-6h4"/></svg>
+      RAG 流程
+    </button>
+    <button type="button" class="nav-btn" data-view="scenarios">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M8 12H4m16 0h-4M8 8l-4 4 4 4M16 8l4 4-4 4"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+      场景流程
+    </button>
+    <button type="button" class="nav-btn" data-view="mcp">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6M9 15h6"/></svg>
+      MCP / 系统调用
+    </button>
+
+
+  </nav>
+  <div class="sidebar-footer">
+    数据来自 AST（<code style="font-family:var(--font-mono);font-size:10px;">npm run parse</code>）。Cytoscape / Dagre / Mermaid 在 <code>npm start</code> 前同步到 <code>public/vendor/</code> 同源加载，可减少 Edge「跟踪防护」对第三方脚本的存储警告。
+  </div>
+</aside>
+
+<div class="app-main">
+  <header class="topbar">
+    <div class="topbar-titles">
+      <div class="view-heading" id="topTitle">总览</div>
+      <div class="view-desc" id="topDesc">理解仓库分层、检索路径与对外暴露的工具边界。</div>
+    </div>
+    <div class="live-status">
+      <span class="status-dot" id="statusDot" aria-hidden="true"></span>
+      <span id="statusText">就绪</span>
+    </div>
+  </header>
+
+  <main class="main-scroll">
+    <section id="view-overview" class="view-section active" aria-label="总览">
+      <div class="bento" id="overviewBento"></div>
+    </section>
+
+    <section id="view-modules" class="view-section" aria-label="RAG 检索全景">
+      <div class="graph-view-inner">
+        <div class="retrieval-overview-page">
+          <div class="intro-strip intro-strip--compact">
+            <div class="intro-inner"><strong style="color:var(--text)">一条查询在系统里怎么走</strong> — 不拆「每个文件」讲细枝末节，只把 <strong>检索相关的环节</strong>：入口、查询预处理、Hybrid 双路召回、向量库与 BM25、RRF 融合、精排与回复组装，串成一张总览；下方卡片与 <code>call_flows.query</code> 步骤对齐，便于你在仓库里按模块名跳转。</div>
+            <div class="retrieval-intro-actions">
+              <button type="button" class="jump-btn" id="jumpToPipelineFromRetrieval">打开 RAG 流程（动画 + 可点击拓扑）</button>
+            </div>
+          </div>
+          <section class="diagram-block diagram-surface diagram-surface--arch retrieval-top-diagram" aria-label="检索链路总览图">
+            <div class="diagram-block-head">
+              <h3>检索链路总览</h3>
+              <p class="diagram-block-lead">实心箭头为主干；<strong>子图「并行召回」</strong>内 Dense / Sparse <strong>同时</strong>从 Hybrid 接任务；灰虚线连到 <strong>Chroma / BM25</strong> 表示读存储。<strong>RRF</strong> 之后在 Hybrid 里做 <code>_apply_metadata_filters</code>，再回到 <strong>query_knowledge_hub</strong> 调用 Reranker，最后 Builder 拼装引用与多模态。可调 Cytoscape 见「RAG 流程」。</p>
+            </div>
+            <div class="mermaid-host mermaid-host--polish" id="retrievalOverviewMermaid"></div>
+          </section>
+          <div id="retrievalAspectsHost" class="retrieval-aspects-root"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-scenarios" class="view-section" aria-label="用户场景流程">
+      <div class="graph-view-inner scenario-outer">
+        <div id="scenario-page" class="scenario-page">
+          <div class="intro-strip intro-strip--compact">
+            <div class="intro-inner"><strong style="color:var(--text)">端到端视角</strong> — 分别从<strong>宿主发起的一条查询</strong>与<strong>一份 PDF 走摄取流水线</strong>两条主线，补齐<strong>谁在调用谁（架构）</strong>、<strong>数据怎么流动</strong>、以及 <code>core.types</code> 里<strong>领域对象如何变形</strong>（对齐 <code>DOCUMENT</code> · <code>Chunk</code> · <code>ChunkRecord</code> · <code>RetrievalResult</code>）。</div>
+          </div>
+          <div class="scenario-toolbar" role="tablist" aria-label="场景切换">
+            <button type="button" class="scenario-subtab active" role="tab" aria-selected="true" aria-controls="scenario-panel-query" id="tab-query" data-scenario="query">在线查询场景</button>
+            <button type="button" class="scenario-subtab" role="tab" aria-selected="false" aria-controls="scenario-panel-ingest" id="tab-ingest" data-scenario="ingest">PDF → 向量 / BM25 摄取场景</button>
+          </div>
+
+          <div id="scenario-panel-query" class="scenario-panel active" role="tabpanel" aria-labelledby="tab-query">
+            <p class="scenario-panel-lead">典型路径：<strong>tools/call</strong> → <code>query_knowledge_hub</code>；参数为 JSON。<code>QueryProcessor.process</code> 产出<strong>结构化查询</strong>驱动 Hybrid；命中经精排再回到 <strong>ResponseBuilder</strong> 变成 MCP 工具返回值。</p>
+            <section class="diagram-block diagram-surface retrieval-top-diagram" aria-label="查询场景架构">
+              <div class="diagram-block-head">
+                <h3>架构 · 谁与谁对话</h3>
+                <p class="diagram-block-lead">用户 / Agent / IDE（宿主）经 MCP Client 与本 Server 会话；服务端由工具处理器衔接核心检索管线。</p>
+              </div>
+              <div class="mermaid-host mermaid-host--polish" id="scenario-mermaid-query-arch"></div>
+            </section>
+            <section class="diagram-block diagram-surface" aria-label="查询场景数据流">
+              <div class="diagram-block-head">
+                <h3>数据流 · 载荷如何传递</h3>
+                <p class="diagram-block-lead">从 MCP 解析出的参数一路变形为向量/BM25 候选，再汇合为最终结果列表与对外 JSON。</p>
+              </div>
+              <div class="mermaid-host mermaid-host--polish" id="scenario-mermaid-query-flow"></div>
+            </section>
+            <section class="diagram-block diagram-surface" aria-label="查询数据结构">
+              <div class="diagram-block-head">
+                <h3>核心类型演变 · 查询侧</h3>
+                <p class="diagram-block-lead"><code>query_processor.ProcessedQuery</code> → 各召回器产出 <code>RetrievalResult</code> · <code>ResponseBuilder.build</code>。</p>
+              </div>
+              <div class="mermaid-host mermaid-host--polish" id="scenario-mermaid-query-types"></div>
+              <div class="scenario-type-notes">
+                <ul>
+                  <li><strong>MCP arguments</strong>：`query` · `top_k`（可由工具裁剪上限）· 预留 filters 等与 <code>ProcessedQuery.filters</code> 对齐字段。</li>
+                  <li><strong>ProcessedQuery</strong>：<code>raw_query</code> / <code>normalized_query</code> / <code>keywords</code> / <code>filters</code> · 传给 Hybrid 与稀疏统计路径。</li>
+                  <li><strong>RetrievalResult</strong>：<code>chunk_id</code> · <code>score</code> · <code>text</code> · <code>metadata</code> · 多条组成精排输入与最终引用来源。</li>
+                </ul>
+              </div>
+            </section>
+          </div>
+
+          <div id="scenario-panel-ingest" class="scenario-panel" role="tabpanel" aria-labelledby="tab-ingest">
+            <p class="scenario-panel-lead">以<strong>磁盘上的 PDF</strong>为例：<code>PdfLoader</code>先把二进制页变成<strong>整篇文本 + 元数据契约</strong>（含<code>[IMAGE: id]</code>占位），再在进入向量库/BM25 前逐级变成 <strong>Chunk</strong> · <strong>ChunkRecord</strong>。</p>
+            <section class="diagram-block diagram-surface retrieval-top-diagram" aria-label="摄取场景架构">
+              <div class="diagram-block-head">
+                <h3>架构 · 摄取链路挂载点</h3>
+                <p class="diagram-block-lead">Loader 向上对接文件系统；流水线向下对接嵌入与两处索引（dense + sparse）。</p>
+              </div>
+              <div class="mermaid-host mermaid-host--polish" id="scenario-mermaid-ingest-arch"></div>
+            </section>
+            <section class="diagram-block diagram-surface" aria-label="摄取数据流">
+              <div class="diagram-block-head">
+                <h3>数据流 · PDF 如何变成可查片段</h3>
+                <p class="diagram-block-lead">页序拼接 → Transform 可选增强 → 批编码 → Upsert。</p>
+              </div>
+              <div class="mermaid-host mermaid-host--polish" id="scenario-mermaid-ingest-flow"></div>
+            </section>
+            <section class="diagram-block diagram-surface" aria-label="摄取数据结构 PDF">
+              <div class="diagram-block-head">
+                <h3>数据结构演变 · PDF 示例</h3>
+                <p class="diagram-block-lead"><code>core.types.Document → Chunk → ChunkRecord</code>；与 <code>libs.splitter</code> 内部 chunk 的差异在 ingest 中会映射到契约类型。</p>
+              </div>
+              <div class="mermaid-host mermaid-host--polish" id="scenario-mermaid-ingest-types"></div>
+              <div class="scenario-type-notes">
+                <ul>
+                  <li><strong>磁盘</strong>：<code>.pdf</code> · <code>PdfLoader.load(path)</code> 读分页 reader。</li>
+                  <li><strong>Document（首次定型）</strong>：唯一 <code>id</code>；<code>text</code>=全文（页间用换行）；<code>metadata</code> 至少含 <code>source_path</code> · <code>page_count</code>；正文里可穿插 <strong><code>[IMAGE: …]</code></strong> 占位；可选 <code>metadata.images[]</code> · 每项记录 <code>id</code> · <code>path</code> · <code>text_offset</code> · <code>text_length</code> · 以及与页对齐的摘录信息。</li>
+                  <li><strong>Chunk</strong>：<code>start_offset</code>/<code>end_offset</code> 锁回原文；· <code>source_ref</code> 可追溯父文档；· <code>metadata</code> 随 Refiner · Enricher · Captioner 增补。</li>
+                  <li><strong>ChunkRecord</strong>：在文本与 meta 基础上附加 <code>dense_vector</code> 与稀疏侧统计向量 / 条目，再由 <strong>VectorUpserter</strong> 与 <strong>BM25Indexer</strong> 落盘。</li>
+                </ul>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-pipeline" class="view-section" aria-label="RAG 管线">
+      <div class="graph-view-inner">
+        <div class="pipeline-page-head">
+          <p class="pipeline-reading-hint">推荐阅读顺序：<strong>先看阶段示意与「播放」</strong>走完一遍动画，再在<strong>左侧步骤</strong>或中间<strong>拓扑图</strong>里点开对照。步骤上方的<strong>青绿色条</strong>是阶段名，与示意图各格<strong>标题</strong>一致。</p>
+          <details class="pipeline-spec-details">
+            <summary class="pipeline-spec-summary">DEV_SPEC 要点摘录<span class="pipeline-spec-sum-hint"> · 点击展开</span></summary>
+            <div class="intro-strip intro-strip--compact pipeline-intro-condensed">
+              <div class="intro-inner">与「RAG 检索全景」互补：检索页是<strong>按阶段的模块鸟瞰</strong>；本页用解析器恢复的<strong>调用顺序</strong>把整条路径串在一起。下方摘录可对照仓库根目录 <code>DEV_SPEC.md</code>。</div>
+            </div>
+            <div class="spec-reading" id="pipelineSpecReading"></div>
+          </details>
+        </div>
+        <div class="pipeline-work-zone">
+        <div class="flow-demo-panel" id="pipelineFlowKbRegion" tabindex="0" role="region" aria-label="阶段示意与流程动画">
+          <div class="flow-demo-head">
+            <span class="flow-demo-title">流程动画 · 阶段高亮</span>
+            <div class="flow-demo-actions" id="flowAnimControls">
+              <button type="button" class="anim-btn" id="btnFlowPlay">播放</button>
+              <button type="button" class="anim-btn" id="btnFlowPause" disabled>暂停</button>
+            </div>
+          </div>
+          <p class="flow-kbd-hint"><kbd>Space</kbd>：焦点在本区域且<strong>不在</strong>示意图内时，播放／暂停。<kbd>↑</kbd><kbd>↓</kbd>：焦点在左侧某一步时切换步骤。</p>
+          <p class="flow-phase-caption" id="flowPhaseCaption">点击「播放」或点击下方示意图阶段，查看右侧说明与图中高亮。</p>
+          <div class="schematic-wrap" id="flowSchematicHost"></div>
+        </div>
+        <div class="pipeline-split">
+          <div class="step-rail" id="stepRail"><h3>加载中…</h3></div>
+          <div class="workspace-split">
+            <div class="graph-panel">
+              <div class="graph-toolbar flow-toggle" id="toolbarPipeline">
+                <button type="button" class="active" data-flow="query">查询（在线）</button>
+                <button type="button" data-flow="ingestion">摄取（离线）</button>
+              </div>
+              <div class="cy-root" id="cy-pipeline"></div>
+            </div>
+            <aside class="inspector" aria-label="步骤说明">
+              <div class="inspector-header" id="inspectorPipelineTitle">管线详情</div>
+              <div class="inspector-body prose" id="inspectorPipelineBody"><p>使用上方<strong>折叠</strong>中的 DEV_SPEC 要点，或对左侧步骤／中间拓扑点击；播放动画时 Inspector 会与阶段同步。</p></div>
+            </aside>
+          </div>
+        </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-mcp" class="view-section" aria-label="MCP">
+      <div class="proto-banner" id="protoBanner"></div>
+      <div class="mcp-grid" id="mcpGrid"></div>
+    </section>
+  </main>
+</div>
+
+<div id="errBox" role="alert"></div>
+<script>window.onerror=function(m,s,l){var b=document.getElementById("errBox");b.style.display="block";b.textContent="JS Error: "+m+" ("+s+":"+l+")";return false;};</script>
+<script>
+window.__CODE_VIZ__ = window.__CODE_VIZ__ || {};
+/** 可选：覆盖 DEV_SPEC 在托管上的 Markdown blob 地址（不要带 # 锚点）。
+ *  支持占位符 {branch}（未设 devSpecBranch 时用 parse 写入的 metadata.code_viz.origin_default_branch）。
+ *  示例：window.__CODE_VIZ__.devSpecMarkdownUrl = "https://github.com/you/fork/blob/{branch}/DEV_SPEC.md"; */
+</script>
+<script src="app.js"></script>
+</body>
+</html>

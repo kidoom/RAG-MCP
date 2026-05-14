@@ -1,0 +1,24 @@
+{
+  "name": "modular-rag-code-viz",
+  "version": "1.0.0",
+  "description": "Code-driven interactive visualization for Modular RAG MCP Server",
+  "main": "server.js",
+  "scripts": {
+    "vendor": "node scripts/sync-vendor-libs.js",
+    "prestart": "node scripts/sync-vendor-libs.js",
+    "start": "node server.js",
+    "parse": "python parser/extract.py"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.0",
+    "cytoscape": "^3.30.2",
+    "cytoscape-dagre": "^2.5.0",
+    "dagre": "^0.8.5",
+    "express": "^4.21.0",
+    "mermaid": "^10.6.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0",
+    "github-slugger": "^2.0.0"
+  }
+}

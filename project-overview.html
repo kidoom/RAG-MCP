@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Modular RAG MCP Server 技术实现导览——把 RAG、MCP、摄取、评估拆成可逐层读懂的工程链路。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🧩</text></svg>">
+<title>Modular RAG MCP Server 项目学习导览</title>
+<style>
+:root{
+  --bg:#f6f7fb;
+  --panel:#ffffff;
+  --panel-soft:#f0f4f8;
+  --ink:#162033;
+  --muted:#667085;
+  --line:#d9e1ea;
+  --cyan:#0277bd;
+  --green:#16824c;
+  --amber:#b96b00;
+  --red:#ba2d2d;
+  --violet:#6950a1;
+  --code:#101828;
+  --radius:8px;
+  --shadow:0 10px 30px rgba(15,23,42,.08);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif;
+  color:var(--ink);
+  background:var(--bg);
+  line-height:1.65;
+}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd{
+  font-family:"Cascadia Code","SFMono-Regular",Consolas,monospace;
+  font-size:.92em;
+}
+code{background:#edf2f7;border:1px solid #dbe4ee;border-radius:5px;padding:.08rem .35rem}
+pre{
+  margin:12px 0 0;
+  padding:16px;
+  overflow:auto;
+  color:#e4e7ec;
+  background:var(--code);
+  border-radius:var(--radius);
+  line-height:1.55;
+  border:1px solid #263244;
+}
+pre code{background:transparent;border:0;color:inherit;padding:0;font-size:12.5px}
+.shell{color:#abe2b2}
+.kw{color:#b9a8ff}.fn{color:#8bd3ff}.st{color:#b8e986}.cm{color:#98a2b3}.num{color:#ffd08a}
+
+.layout{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:100vh}
+.sidebar{
+  position:sticky;top:0;height:100vh;overflow:auto;
+  background:#111827;color:#e5e7eb;border-right:1px solid #1f2937;
+  padding:20px 16px;
+}
+.brand{padding:4px 6px 18px;border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:14px}
+.brand strong{display:block;font-size:18px;line-height:1.25}
+.brand span{display:block;margin-top:6px;color:#9ca3af;font-size:12px}
+.nav-group{margin:16px 0 6px;color:#9ca3af;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.nav a{
+  display:block;padding:8px 10px;margin:2px 0;border-radius:6px;
+  color:#cbd5e1;font-size:13px;text-decoration:none;border-left:3px solid transparent;
+}
+.nav a:hover,.nav a.active{background:#1f2937;color:#fff;border-left-color:#38bdf8}
+.main{min-width:0;overflow-x:hidden}
+.hero{
+  background:#ffffff;
+  border-bottom:1px solid var(--line);
+  padding:42px 52px 28px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+.hero>*{width:min(1180px,100%)}
+.eyebrow{color:var(--cyan);font-weight:800;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+h1{font-size:34px;line-height:1.2;margin:8px 0 12px;letter-spacing:0}
+.hero p{max-width:940px;color:#475467;font-size:16px;margin:0}
+.hero-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;max-width:1000px;margin-top:24px}
+.metric{background:#f8fafc;border:1px solid var(--line);border-radius:var(--radius);padding:14px}
+.metric b{display:block;font-size:24px;color:#111827}
+.metric span{font-size:12px;color:var(--muted)}
+
+.content{width:min(1180px,100%);padding:34px 52px 70px;margin:0 auto}
+section{scroll-margin-top:24px;margin-bottom:42px}
+h2{font-size:24px;line-height:1.3;margin:0 0 14px;padding-bottom:9px;border-bottom:1px solid var(--line)}
+h3{font-size:18px;line-height:1.35;margin:24px 0 10px}
+h4{font-size:15px;margin:0 0 6px}
+p{margin:0 0 12px;color:#475467}
+ul,ol{margin:10px 0 0;padding-left:22px;color:#475467}
+li{margin:6px 0}
+.lead{font-size:15px;max-width:860px}
+
+.callout{
+  border-left:4px solid var(--cyan);
+  background:#eef7fc;
+  padding:14px 16px;
+  border-radius:0 var(--radius) var(--radius) 0;
+  margin:14px 0;
+}
+.callout strong{color:#075985}
+.warn{border-left-color:var(--amber);background:#fff7ed}
+.warn strong{color:#92400e}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.grid.three{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.panel{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:18px;
+  box-shadow:var(--shadow);
+}
+.panel.tight{padding:14px;box-shadow:none}
+.panel p:last-child{margin-bottom:0}
+.tagrow{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0}
+.tag{
+  display:inline-flex;align-items:center;min-height:26px;
+  border:1px solid var(--line);border-radius:999px;background:#fff;
+  padding:3px 10px;font-size:12px;color:#344054;font-weight:700;
+}
+.tag.cyan{border-color:#b6e3f7;color:#075985;background:#eef7fc}
+.tag.green{border-color:#bfe7ce;color:#166534;background:#eefaf2}
+.tag.amber{border-color:#ffd59a;color:#92400e;background:#fff8eb}
+.tag.violet{border-color:#d7cbff;color:#553c9a;background:#f5f1ff}
+.tag.red{border-color:#ffc6c6;color:#991b1b;background:#fff1f1}
+
+.path{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:14px}
+.path-step{
+  position:relative;min-height:118px;background:#fff;border:1px solid var(--line);
+  border-top:4px solid var(--cyan);border-radius:var(--radius);padding:14px;
+}
+.path-step:nth-child(2){border-top-color:var(--green)}
+.path-step:nth-child(3){border-top-color:var(--amber)}
+.path-step:nth-child(4){border-top-color:var(--violet)}
+.path-step:nth-child(5){border-top-color:var(--red)}
+.path-step b{display:block;font-size:13px;color:#111827}
+.path-step span{display:block;margin-top:6px;color:var(--muted);font-size:12px}
+
+.flow{background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+.flow-row{display:grid;grid-template-columns:minmax(132px,170px) minmax(260px,1fr) minmax(180px,240px);border-top:1px solid var(--line)}
+.flow-row:first-child{border-top:0}
+.flow-cell{padding:14px 16px}
+.flow-name{font-weight:800;color:#111827;background:#f8fafc}
+.flow-detail{color:#475467}
+.flow-file{background:#fbfcfe;color:#344054;font-size:12px}
+.flow-file code{display:inline-block;margin:2px 0}
+
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:var(--radius);background:#fff}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:11px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:#f8fafc;color:#344054;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+tr:last-child td{border-bottom:0}
+td:first-child{font-weight:700;color:#1f2937}
+
+.source-map{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:10px}
+.source-map div{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:12px}
+.source-map b{display:block;font-size:13px}
+.source-map span{color:var(--muted);font-size:12px}
+.source-map code{word-break:break-all}
+
+details{background:#fff;border:1px solid var(--line);border-radius:var(--radius);margin:10px 0;overflow:hidden}
+summary{cursor:pointer;font-weight:800;color:#111827;padding:13px 16px;background:#f8fafc}
+details[open] summary{border-bottom:1px solid var(--line)}
+.detail-body{padding:14px 16px}
+
+.checklist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.check{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:14px}
+.check b{display:block;color:#111827;margin-bottom:4px}
+.check span{color:var(--muted);font-size:13px}
+
+.toc-note{margin-top:18px;padding:12px;border:1px solid rgba(255,255,255,.14);border-radius:var(--radius);color:#cbd5e1;background:rgba(255,255,255,.04);font-size:12px}
+.copy-btn{
+  float:right;margin-top:-4px;
+  border:1px solid var(--line);background:#fff;border-radius:6px;
+  padding:4px 8px;color:#344054;font-size:12px;cursor:pointer;
+}
+.copy-btn:hover{background:#f2f4f7}
+
+.diagram-card{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:18px;
+  box-shadow:var(--shadow);
+  overflow:auto;
+}
+.diagram-title{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:12px}
+.diagram-title h3{margin:0}
+.diagram-title p{max-width:680px;font-size:13px;margin:0}
+.arch-svg,.data-svg{display:block;width:100%;min-width:860px;height:auto}
+.box-label{font-size:13px;font-weight:800;fill:#111827}
+.box-sub{font-size:10.5px;fill:#667085}
+.line{stroke:#8aa4bd;stroke-width:2;fill:none;marker-end:url(#arrow)}
+.line-soft{stroke:#c4d3e0;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#arrowSoft)}
+.flow-dot{fill:#0277bd;filter:url(#dotShadow)}
+.flow-dot.green{fill:#16824c}
+.flow-dot.amber{fill:#b96b00}
+.flow-dot.violet{fill:#6950a1}
+.pulse{animation:pulse 1.8s ease-in-out infinite;transform-origin:center}
+@keyframes pulse{0%,100%{opacity:.78}50%{opacity:1}}
+.phase-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:14px}
+.phase{
+  background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:14px;
+  border-top:4px solid var(--cyan);
+}
+.phase:nth-child(2){border-top-color:var(--green)}
+.phase:nth-child(3){border-top-color:var(--amber)}
+.phase:nth-child(4){border-top-color:var(--violet)}
+.phase:nth-child(5){border-top-color:var(--red)}
+.phase b{display:block;color:#111827;margin-bottom:4px}
+.phase span{display:block;color:var(--muted);font-size:13px}
+.mini-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:12px}
+.mini-step{background:#fbfcfe;border:1px solid var(--line);border-radius:var(--radius);padding:12px}
+.mini-step b{display:block;color:#111827;font-size:13px;margin-bottom:4px}
+.mini-step span{color:var(--muted);font-size:12px}
+
+@media(max-width:980px){
+  .layout{grid-template-columns:1fr}
+  .sidebar{position:relative;height:auto}
+  .nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+  .nav-group,.toc-note{display:none}
+  .hero,.content{padding-left:22px;padding-right:22px}
+  .hero-grid,.grid,.grid.three,.path,.checklist{grid-template-columns:1fr}
+  .flow-row{grid-template-columns:1fr}
+  .flow-name,.flow-file{background:#fff}
+  .flow-file{border-top:1px dashed var(--line)}
+}
+@media(max-width:560px){
+  h1{font-size:28px}
+  .hero,.content{padding-left:16px;padding-right:16px}
+  .nav{grid-template-columns:1fr}
+  .source-map{grid-template-columns:1fr}
+}
+
+	/* ── Dark Mode ── */
+	@media(prefers-color-scheme:dark){
+	  :root{
+	    --bg:#0f172a;
+	    --panel:#1e293b;
+	    --panel-soft:#1a2332;
+	    --ink:#e2e8f0;
+	    --muted:#94a3b8;
+	    --line:#334155;
+	    --code:#0f172a;
+	    --shadow:0 10px 30px rgba(0,0,0,.35);
+	  }
+	  body{background:var(--bg);color:var(--ink)}
+	  code{background:#1e293b;border-color:#334155}
+	  pre{border-color:#1e293b}
+	  .hero{background:#1e293b}
+	  .hero p,.lead,p,ul,ol{color:#cbd5e1}
+	  .metric{background:#1e293b}
+	  .metric b{color:#f1f5f9}
+	  .panel{background:var(--panel)}
+	  .callout{background:#0c1f2e}
+	  .warn{background:#241e0c}
+	  .flow,.phase,.path-step,.mini-step,.tag,.check,.source-map div,.diagram-card{background:#1e293b}
+	  .flow-name,.flow-file{background:#111827}
+	  .flow-file{color:#cbd5e1}
+	  th{background:#111827;color:#cbd5e1}
+	  td:first-child{color:#f1f5f9}
+	  td,tr{border-color:#334155}
+	  .path-step b,.phase b,.mini-step b,.check b,.flow-name,.source-map b{color:#f1f5f9}
+	  .copy-btn{background:#334155;border-color:#475569;color:#cbd5e1}
+	  .copy-btn:hover{background:#475569}
+	  .df-box{fill:#1e293b;stroke:#475569}
+	  .df-lane{fill:#111827;stroke:#334155}
+	  .df-title{fill:#e2e8f0}
+	  .df-sub{fill:#94a3b8}
+	  details{background:var(--panel)}
+	  summary{background:#111827;color:#e2e8f0}
+	  .detail-body{color:#cbd5e1}
+	  .tag{background:#1e293b;color:#cbd5e1}
+	  .table-wrap{background:var(--panel)}
+	  .toc-note{background:rgba(255,255,255,.06);color:#94a3b8}
+	}
+
+	/* ── Print ── */
+	@media print{
+	  .sidebar,.copy-btn{display:none!important}
+	  .layout{display:block}
+	  .hero,.content{padding:20px 0;max-width:100%}
+	  .hero>*,.content{width:100%;max-width:100%}
+	  h1{font-size:24px}
+	  h2{font-size:18px}
+	  pre,code{background:#f5f5f5!important;color:#111!important;border:1px solid #ccc!important}
+	  .diagram-card,.panel,.callout,.flow{box-shadow:none;border:1px solid #ccc;break-inside:avoid}
+	  .flow-row{grid-template-columns:1fr 2fr 1.5fr}
+	  svg{max-width:100%;height:auto}
+	  svg circle{animation:none!important}
+	  a{color:#111;text-decoration:underline}
+	  .checklist{grid-template-columns:1fr}
+	  .back-to-top,.pause-btn{display:none!important}
+	}
+
+	/* ── Sidebar Toggle ── */
+	.sidebar-toggle{
+	  display:none;
+	  position:fixed;top:12px;right:14px;z-index:200;
+	  width:40px;height:36px;border:1px solid rgba(255,255,255,.25);border-radius:6px;
+	  background:#111827;color:#e5e7eb;font-size:20px;cursor:pointer;align-items:center;justify-content:center;line-height:1;
+	}
+	@media(max-width:980px){
+	  .sidebar-toggle{display:flex}
+	  .sidebar.collapsed{display:none}
+	}
+
+	/* ── Back to Top ── */
+	.back-to-top{
+	  display:flex;align-items:center;justify-content:center;
+	  position:fixed;bottom:28px;right:28px;z-index:150;
+	  width:42px;height:42px;border-radius:50%;border:1px solid var(--line);
+	  background:var(--panel);color:var(--ink);cursor:pointer;
+	  box-shadow:var(--shadow);opacity:0;transform:translateY(12px);
+	  transition:opacity .25s,transform .25s;pointer-events:none;font-size:18px;
+	}
+	.back-to-top.visible{opacity:1;transform:translateY(0);pointer-events:auto}
+	.back-to-top:hover{background:var(--panel-soft)}
+
+	/* ── Animation Pause ── */
+	.pause-btn{
+	  display:inline-flex;align-items:center;gap:5px;
+	  border:1px solid var(--line);background:var(--panel);border-radius:6px;
+	  padding:5px 10px;color:var(--muted);font-size:12px;cursor:pointer;margin-top:8px;
+	}
+	.pause-btn:hover{background:var(--panel-soft);color:var(--ink)}
+	.pause-btn.paused{color:var(--cyan);border-color:var(--cyan)}
+	svg.paused circle{animation-play-state:paused!important}
+
+	/* ── Performance ── */
+	section{content-visibility:auto;contain-intrinsic-size:auto 600px}
+	/* ── Step Progress Indicator ── */
+	.step-progress{margin-top:16px;overflow-x:auto}
+	.step-row{display:flex;flex-wrap:wrap;gap:6px}
+	.step-item{
+	  display:flex;align-items:center;gap:6px;
+	  padding:6px 12px;border-radius:20px;
+	  background:#f8fafc;border:1px solid var(--line);
+	  font-size:12px;color:var(--muted);white-space:nowrap;
+	  transition:all .3s;
+	}
+	.step-dot{
+	  width:8px;height:8px;border-radius:50%;
+	  background:var(--line);transition:all .3s;
+	}
+	.step-item.active{
+	  background:#eef7fc;border-color:#38bdf8;color:#075985;
+	}
+	.step-item.active .step-dot{background:#38bdf8;box-shadow:0 0 6px #38bdf8}
+	.step-item.done{
+	  background:#f0faf4;border-color:#86dbb0;color:#166534;
+	}
+	.step-item.done .step-dot{background:#4ade80}
+	@media(prefers-color-scheme:dark){
+	  .step-item{background:#1e293b}
+	  .step-item.active{background:#0c1f2e;color:#7dd3fc}
+	  .step-item.done{background:#0a1f14;color:#86dbb0}
+	}
+
+</style>
+</head>
+<body>
+<div class="layout">
+  <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">&#9776;</button>
+  <aside class="sidebar">
+    <div class="brand">
+      <strong>Modular RAG MCP Server</strong>
+      <span>面向学习的技术实现导览</span>
+    </div>
+    <nav class="nav" aria-label="页面导航">
+      <div class="nav-group">Learning Path</div>
+      <a href="#why" class="active">先看什么</a>
+      <a href="#architecture">总体架构</a>
+      <a href="#dataflow">数据流动画</a>
+      <a href="#call-flow">调用链路动画</a>
+      <a href="#query">查询链路</a>
+      <a href="#rag-full">RAG 全流程</a>
+      <a href="#ingestion">数据摄取</a>
+      <a href="#mcp">MCP 服务</a>
+      <div class="nav-group">Implementation</div>
+      <a href="#config">配置入口</a>
+      <a href="#observability">可观测性</a>
+      <a href="#extension">扩展点</a>
+      <a href="#debug">调试清单</a>
+      <a href="#files">源码地图</a>
+    </nav>
+    <div class="toc-note">
+      本页聚焦“读懂项目”。每个技术点都尽量对应到源码路径、数据结构和运行时行为。
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="hero">
+      <div class="eyebrow">Project Study Guide</div>
+      <h1>把 RAG、MCP、摄取、评估拆成可以逐层读懂的工程链路</h1>
+      <p>
+        这个项目不是单纯的 RAG Demo，而是一个模块化服务框架：PDF 等文档先被摄取成 Chunk、向量和 BM25 索引；
+        查询时走 Dense + Sparse 混合召回、RRF 融合、Rerank 精排；最后通过 MCP JSON-RPC 暴露给 Copilot、Claude 等客户端。
+      </p>
+      <div class="hero-grid">
+        <div class="metric"><b>2</b><span>Dense / Sparse 双检索通路</span></div>
+        <div class="metric"><b>5</b><span>默认最终返回 Top-K</span></div>
+        <div class="metric"><b>60</b><span>RRF 默认平滑参数</span></div>
+        <div class="metric"><b>3</b><span>MCP Tool 对外暴露</span></div>
+      </div>
+    </header>
+
+    <div class="content">
+      <section id="why">
+        <h2>先看什么</h2>
+        <p class="lead">
+          学这个项目最容易卡住的地方，是把“模型能力”和“工程链路”混在一起。建议按下面顺序读：先抓主流程，再看每一步的输入输出，最后再替换 Provider 或调参。
+        </p>
+        <div class="path">
+          <div class="path-step"><b>1. 跑通配置</b><span>理解 <code>config/settings.yaml</code> 如何决定 LLM、Embedding、VectorStore、Rerank。</span></div>
+          <div class="path-step"><b>2. 读摄取链路</b><span>文件如何变成 Document、Chunk、ChunkRecord、Chroma 向量和 BM25 索引。</span></div>
+          <div class="path-step"><b>3. 读查询链路</b><span>QueryProcessor、DenseRetriever、SparseRetriever、Fusion、Reranker 如何串起来。</span></div>
+          <div class="path-step"><b>4. 读 MCP 封装</b><span>JSON-RPC 的 initialize、tools/list、tools/call 如何映射到 Python 函数。</span></div>
+          <div class="path-step"><b>5. 看观测与测试</b><span>TraceContext、Dashboard、unit/integration/e2e 测试如何帮助定位问题。</span></div>
+        </div>
+        <div class="callout">
+          <strong>学习主线：</strong>这套代码最值得学的是“接口抽象 + 配置驱动 + 降级保护 + 可观测性”。模型只是其中一个可替换部件。
+        </div>
+      </section>
+
+      <section id="architecture">
+        <h2>总体架构</h2>
+        <div class="diagram-card">
+          <div class="diagram-title">
+            <h3>系统架构图</h3>
+            <p>这张图按运行边界来读：左侧是外部入口，中间是协议层和核心业务层，右侧是可插拔 Provider，底部是持久化、观测和测试支撑。</p>
+          </div>
+          <svg class="arch-svg" viewBox="0 0 1040 520" role="img" aria-label="Modular RAG MCP Server 系统架构图">
+            <defs>
+              <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+                <path d="M0,0 L10,4 L0,8 Z" fill="#8aa4bd"></path>
+              </marker>
+              <marker id="arrowSoft" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+                <path d="M0,0 L10,4 L0,8 Z" fill="#c4d3e0"></path>
+              </marker>
+              <filter id="boxShadow" x="-10%" y="-20%" width="120%" height="140%">
+                <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0f172a" flood-opacity=".12"></feDropShadow>
+              </filter>
+              <filter id="dotShadow">
+                <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#0277bd" flood-opacity=".55"></feDropShadow>
+              </filter>
+            </defs>
+
+            <rect x="16" y="20" width="1008" height="480" rx="14" fill="#f8fafc" stroke="#d9e1ea"></rect>
+
+            <rect x="44" y="76" width="160" height="82" rx="8" fill="#eef7fc" stroke="#b6e3f7" filter="url(#boxShadow)"></rect>
+            <text x="124" y="108" text-anchor="middle" class="box-label">MCP Client</text>
+            <text x="124" y="130" text-anchor="middle" class="box-sub">Copilot / Claude / CLI</text>
+
+            <rect x="44" y="260" width="160" height="82" rx="8" fill="#fff8eb" stroke="#ffd59a" filter="url(#boxShadow)"></rect>
+            <text x="124" y="292" text-anchor="middle" class="box-label">Document Input</text>
+            <text x="124" y="314" text-anchor="middle" class="box-sub">PDF / text / images</text>
+
+            <rect x="270" y="70" width="180" height="96" rx="8" fill="#f5f1ff" stroke="#d7cbff" filter="url(#boxShadow)"></rect>
+            <text x="360" y="104" text-anchor="middle" class="box-label">MCP Server</text>
+            <text x="360" y="126" text-anchor="middle" class="box-sub">stdio + JSON-RPC</text>
+            <text x="360" y="144" text-anchor="middle" class="box-sub">ProtocolHandler / ToolSpec</text>
+
+            <rect x="520" y="54" width="210" height="128" rx="8" fill="#eefaf2" stroke="#bfe7ce" filter="url(#boxShadow)"></rect>
+            <text x="625" y="86" text-anchor="middle" class="box-label">Query Core</text>
+            <text x="625" y="110" text-anchor="middle" class="box-sub">QueryProcessor</text>
+            <text x="625" y="130" text-anchor="middle" class="box-sub">HybridSearch + Fusion</text>
+            <text x="625" y="150" text-anchor="middle" class="box-sub">Reranker + ResponseBuilder</text>
+
+            <rect x="520" y="238" width="210" height="128" rx="8" fill="#fff8eb" stroke="#ffd59a" filter="url(#boxShadow)"></rect>
+            <text x="625" y="270" text-anchor="middle" class="box-label">Ingestion Core</text>
+            <text x="625" y="294" text-anchor="middle" class="box-sub">Loader → Chunker</text>
+            <text x="625" y="314" text-anchor="middle" class="box-sub">Transform → Encode</text>
+            <text x="625" y="334" text-anchor="middle" class="box-sub">VectorUpserter + BM25Indexer</text>
+
+            <rect x="792" y="54" width="190" height="128" rx="8" fill="#ffffff" stroke="#d9e1ea" filter="url(#boxShadow)"></rect>
+            <text x="887" y="86" text-anchor="middle" class="box-label">Provider Libs</text>
+            <text x="887" y="110" text-anchor="middle" class="box-sub">LLM / Embedding</text>
+            <text x="887" y="130" text-anchor="middle" class="box-sub">VectorStore / Reranker</text>
+            <text x="887" y="150" text-anchor="middle" class="box-sub">Splitter / Evaluator</text>
+
+            <rect x="792" y="238" width="190" height="128" rx="8" fill="#fff1f1" stroke="#ffc6c6" filter="url(#boxShadow)"></rect>
+            <text x="887" y="270" text-anchor="middle" class="box-label">Storage</text>
+            <text x="887" y="294" text-anchor="middle" class="box-sub">ChromaDB vectors</text>
+            <text x="887" y="314" text-anchor="middle" class="box-sub">BM25 index</text>
+            <text x="887" y="334" text-anchor="middle" class="box-sub">ImageStorage / logs</text>
+
+            <rect x="270" y="404" width="460" height="58" rx="8" fill="#ffffff" stroke="#d9e1ea"></rect>
+            <text x="500" y="428" text-anchor="middle" class="box-label">Observability & Tests</text>
+            <text x="500" y="448" text-anchor="middle" class="box-sub">TraceContext / JSONL / Streamlit Dashboard / unit + integration + e2e</text>
+
+            <path d="M204 117 H270" class="line"></path>
+            <path d="M450 117 H520" class="line"></path>
+            <path d="M730 117 H792" class="line-soft"></path>
+            <path d="M204 301 H520" class="line"></path>
+            <path d="M730 302 H792" class="line"></path>
+            <path d="M625 238 V182" class="line-soft"></path>
+            <path d="M625 366 V404" class="line-soft"></path>
+            <path d="M625 182 C625 210 720 212 792 238" class="line-soft"></path>
+            <path d="M887 238 V182" class="line-soft"></path>
+
+            <text x="236" y="103" class="box-sub">tools/call</text>
+            <text x="472" y="103" class="box-sub">handler</text>
+            <text x="742" y="101" class="box-sub">factory</text>
+            <text x="342" y="288" class="box-sub">ingest.py / dashboard</text>
+            <text x="744" y="290" class="box-sub">upsert</text>
+          </svg>
+        </div>
+        <div class="grid">
+          <div class="panel">
+            <h3>运行时分层</h3>
+            <div class="flow">
+              <div class="flow-row">
+                <div class="flow-cell flow-name">Client</div>
+                <div class="flow-cell flow-detail">Copilot / Claude / CLI 通过 MCP 或脚本发起请求。</div>
+                <div class="flow-cell flow-file"><code>src/mcp_server/server.py</code></div>
+              </div>
+              <div class="flow-row">
+                <div class="flow-cell flow-name">Protocol</div>
+                <div class="flow-cell flow-detail">解析 JSON-RPC，处理 <code>initialize</code>、<code>tools/list</code>、<code>tools/call</code>。</div>
+                <div class="flow-cell flow-file"><code>src/mcp_server/protocol_handler.py</code></div>
+              </div>
+              <div class="flow-row">
+                <div class="flow-cell flow-name">Core</div>
+                <div class="flow-cell flow-detail">检索、融合、重排、响应构建，是 RAG 查询主链路。</div>
+                <div class="flow-cell flow-file"><code>src/core/query_engine/</code></div>
+              </div>
+              <div class="flow-row">
+                <div class="flow-cell flow-name">Ingestion</div>
+                <div class="flow-cell flow-detail">加载、切分、转换、编码、写入向量库和 BM25 索引。</div>
+                <div class="flow-cell flow-file"><code>src/ingestion/</code></div>
+              </div>
+              <div class="flow-row">
+                <div class="flow-cell flow-name">Libraries</div>
+                <div class="flow-cell flow-detail">LLM、Embedding、VectorStore、Splitter、Reranker 的可插拔实现。</div>
+                <div class="flow-cell flow-file"><code>src/libs/</code></div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <h3>核心数据对象</h3>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>对象</th><th>在哪里出现</th><th>你要关注什么</th></tr></thead>
+                <tbody>
+                  <tr><td><code>Document</code></td><td>Loader 输出</td><td>整份文档文本、文档级 metadata、图片列表。</td></tr>
+                  <tr><td><code>Chunk</code></td><td>DocumentChunker 输出</td><td>稳定 chunk_id、文本片段、父文档引用、图片引用。</td></tr>
+                  <tr><td><code>ChunkRecord</code></td><td>BatchProcessor 输出</td><td>同时携带 dense_vector 与 sparse_vector，准备入库。</td></tr>
+                  <tr><td><code>RetrievalResult</code></td><td>查询链路流转</td><td>chunk_id、score、text、metadata，是 Dense/Sparse/RRF/Rerank 的共同格式。</td></tr>
+                  <tr><td><code>TraceContext</code></td><td>摄取与查询</td><td>记录每个阶段耗时、参数、错误状态，给 Dashboard 和日志使用。</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p style="margin-top:12px">源码入口：<code>src/core/types.py</code>、<code>src/core/trace/trace_context.py</code></p>
+          </div>
+        </div>
+      </section>
+
+      <section id="dataflow">
+        <h2>数据流动画</h2>
+        <p class="lead">这张动态图把项目拆成两条流：上半部分是用户查询实时流，下半部分是离线数据摄取流。查询能命中文档，是因为摄取流提前把同一批 Chunk 写进了 Chroma 和 BM25 两套索引。</p>
+        <div class="diagram-card">
+          <div class="diagram-title">
+            <h3>Query Flow + Ingestion Flow</h3>
+            <div><p>蓝色点表示查询请求，绿色点表示文档摄取，橙色点表示索引写入，紫色点表示最终响应返回。</p><button class="pause-btn" id="pauseBtn" aria-label="Pause animation">&#x23F8; 暂停动画</button></div>
+          </div>
+          <svg class="data-svg" viewBox="0 0 1040 430" role="img" aria-label="RAG 数据流动画">
+            <defs>
+              <marker id="dataArrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+                <path d="M0,0 L10,4 L0,8 Z" fill="#8aa4bd"></path>
+              </marker>
+              <filter id="dataDotShadow">
+                <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#0277bd" flood-opacity=".7"></feDropShadow>
+              </filter>
+              <style>
+                .df-box{fill:#fff;stroke:#d9e1ea;stroke-width:1.3}
+                .df-title{font-size:13px;font-weight:800;fill:#111827}
+                .df-sub{font-size:10.5px;fill:#667085}
+                .df-line{fill:none;stroke:#9cb3c8;stroke-width:2;stroke-dasharray:6 5;marker-end:url(#dataArrow)}
+                .df-lane{fill:#f8fafc;stroke:#d9e1ea}
+              </style>
+            </defs>
+
+            <rect x="18" y="24" width="1004" height="170" rx="12" class="df-lane"></rect>
+            <text x="42" y="54" class="df-title">在线查询流：用户问题 → 检索 → 融合 → 精排 → MCP 响应</text>
+
+            <rect x="40" y="84" width="130" height="70" rx="8" class="df-box"></rect>
+            <text x="105" y="112" text-anchor="middle" class="df-title">User Query</text>
+            <text x="105" y="134" text-anchor="middle" class="df-sub">natural language</text>
+
+            <rect x="214" y="84" width="138" height="70" rx="8" class="df-box"></rect>
+            <text x="283" y="112" text-anchor="middle" class="df-title">Processor</text>
+            <text x="283" y="134" text-anchor="middle" class="df-sub">normalize + keywords</text>
+
+            <rect x="400" y="64" width="150" height="54" rx="8" fill="#eef7fc" stroke="#b6e3f7"></rect>
+            <text x="475" y="88" text-anchor="middle" class="df-title">Dense</text>
+            <text x="475" y="106" text-anchor="middle" class="df-sub">Embedding → Chroma</text>
+
+            <rect x="400" y="132" width="150" height="54" rx="8" fill="#fff8eb" stroke="#ffd59a"></rect>
+            <text x="475" y="156" text-anchor="middle" class="df-title">Sparse</text>
+            <text x="475" y="174" text-anchor="middle" class="df-sub">keywords → BM25</text>
+
+            <rect x="604" y="84" width="126" height="70" rx="8" fill="#eefaf2" stroke="#bfe7ce"></rect>
+            <text x="667" y="112" text-anchor="middle" class="df-title">RRF Fusion</text>
+            <text x="667" y="134" text-anchor="middle" class="df-sub">rank aggregation</text>
+
+            <rect x="770" y="84" width="126" height="70" rx="8" fill="#f5f1ff" stroke="#d7cbff"></rect>
+            <text x="833" y="112" text-anchor="middle" class="df-title">Rerank</text>
+            <text x="833" y="134" text-anchor="middle" class="df-sub">LLM / fallback</text>
+
+            <rect x="930" y="84" width="78" height="70" rx="8" fill="#fff1f1" stroke="#ffc6c6"></rect>
+            <text x="969" y="112" text-anchor="middle" class="df-title">MCP</text>
+            <text x="969" y="134" text-anchor="middle" class="df-sub">content</text>
+
+            <path id="q1" d="M170 119 H214" class="df-line"></path>
+            <path id="q2a" d="M352 119 C374 104 382 92 400 91" class="df-line"></path>
+            <path id="q2b" d="M352 119 C374 140 382 156 400 159" class="df-line"></path>
+            <path id="q3a" d="M550 91 C578 94 586 114 604 119" class="df-line"></path>
+            <path id="q3b" d="M550 159 C580 154 588 128 604 119" class="df-line"></path>
+            <path id="q4" d="M730 119 H770" class="df-line"></path>
+            <path id="q5" d="M896 119 H930" class="df-line"></path>
+
+            <circle r="5" fill="#0277bd" filter="url(#dataDotShadow)">
+              <animateMotion dur="1.2s" repeatCount="indefinite" path="M170 119 H214"></animateMotion>
+            </circle>
+            <circle r="5" fill="#0277bd" filter="url(#dataDotShadow)">
+              <animateMotion dur="1.8s" repeatCount="indefinite" path="M352 119 C374 104 382 92 400 91"></animateMotion>
+            </circle>
+            <circle r="5" fill="#b96b00" filter="url(#dataDotShadow)">
+              <animateMotion dur="1.9s" begin=".25s" repeatCount="indefinite" path="M352 119 C374 140 382 156 400 159"></animateMotion>
+            </circle>
+            <circle r="5" fill="#16824c" filter="url(#dataDotShadow)">
+              <animateMotion dur="1.5s" begin=".15s" repeatCount="indefinite" path="M550 91 C578 94 586 114 604 119"></animateMotion>
+            </circle>
+            <circle r="5" fill="#16824c" filter="url(#dataDotShadow)">
+              <animateMotion dur="1.6s" begin=".35s" repeatCount="indefinite" path="M550 159 C580 154 588 128 604 119"></animateMotion>
+            </circle>
+            <circle r="5" fill="#6950a1" filter="url(#dataDotShadow)">
+              <animateMotion dur="1.3s" begin=".2s" repeatCount="indefinite" path="M730 119 H770"></animateMotion>
+            </circle>
+            <circle r="5" fill="#6950a1" filter="url(#dataDotShadow)">
+              <animateMotion dur="1.2s" begin=".4s" repeatCount="indefinite" path="M896 119 H930"></animateMotion>
+            </circle>
+
+            <rect x="18" y="226" width="1004" height="174" rx="12" class="df-lane"></rect>
+            <text x="42" y="256" class="df-title">离线摄取流：源文件 → Chunk → Transform → Encode → VectorStore + BM25</text>
+
+            <rect x="40" y="288" width="120" height="68" rx="8" class="df-box"></rect>
+            <text x="100" y="316" text-anchor="middle" class="df-title">PDF / File</text>
+            <text x="100" y="338" text-anchor="middle" class="df-sub">source document</text>
+
+            <rect x="200" y="288" width="120" height="68" rx="8" class="df-box"></rect>
+            <text x="260" y="316" text-anchor="middle" class="df-title">Loader</text>
+            <text x="260" y="338" text-anchor="middle" class="df-sub">Document</text>
+
+            <rect x="360" y="288" width="120" height="68" rx="8" class="df-box"></rect>
+            <text x="420" y="316" text-anchor="middle" class="df-title">Chunker</text>
+            <text x="420" y="338" text-anchor="middle" class="df-sub">stable chunk_id</text>
+
+            <rect x="520" y="288" width="120" height="68" rx="8" class="df-box"></rect>
+            <text x="580" y="316" text-anchor="middle" class="df-title">Transform</text>
+            <text x="580" y="338" text-anchor="middle" class="df-sub">metadata / images</text>
+
+            <rect x="680" y="288" width="120" height="68" rx="8" class="df-box"></rect>
+            <text x="740" y="316" text-anchor="middle" class="df-title">Encode</text>
+            <text x="740" y="338" text-anchor="middle" class="df-sub">dense + sparse</text>
+
+            <rect x="842" y="262" width="138" height="54" rx="8" fill="#eef7fc" stroke="#b6e3f7"></rect>
+            <text x="911" y="286" text-anchor="middle" class="df-title">ChromaDB</text>
+            <text x="911" y="304" text-anchor="middle" class="df-sub">vectors + text</text>
+            <rect x="842" y="328" width="138" height="54" rx="8" fill="#fff8eb" stroke="#ffd59a"></rect>
+            <text x="911" y="352" text-anchor="middle" class="df-title">BM25</text>
+            <text x="911" y="370" text-anchor="middle" class="df-sub">inverted index</text>
+
+            <path d="M160 322 H200" class="df-line"></path>
+            <path d="M320 322 H360" class="df-line"></path>
+            <path d="M480 322 H520" class="df-line"></path>
+            <path d="M640 322 H680" class="df-line"></path>
+            <path d="M800 322 C820 300 824 290 842 289" class="df-line"></path>
+            <path d="M800 322 C820 342 824 354 842 355" class="df-line"></path>
+
+            <circle r="5" fill="#16824c" filter="url(#dataDotShadow)">
+              <animateMotion dur="1.2s" repeatCount="indefinite" path="M160 322 H200"></animateMotion>
+            </circle>
+            <circle r="5" fill="#16824c" filter="url(#dataDotShadow)">
+              <animateMotion dur="1.2s" begin=".2s" repeatCount="indefinite" path="M320 322 H360"></animateMotion>
+            </circle>
+            <circle r="5" fill="#16824c" filter="url(#dataDotShadow)">
+              <animateMotion dur="1.2s" begin=".4s" repeatCount="indefinite" path="M480 322 H520"></animateMotion>
+            </circle>
+            <circle r="5" fill="#16824c" filter="url(#dataDotShadow)">
+              <animateMotion dur="1.2s" begin=".6s" repeatCount="indefinite" path="M640 322 H680"></animateMotion>
+            </circle>
+            <circle r="5" fill="#0277bd" filter="url(#dataDotShadow)">
+              <animateMotion dur="1.5s" begin=".3s" repeatCount="indefinite" path="M800 322 C820 300 824 290 842 289"></animateMotion>
+            </circle>
+            <circle r="5" fill="#b96b00" filter="url(#dataDotShadow)">
+              <animateMotion dur="1.5s" begin=".55s" repeatCount="indefinite" path="M800 322 C820 342 824 354 842 355"></animateMotion>
+            </circle>
+          </svg>
+        </div>
+      </section>
+
+
+      <section id="call-flow">
+        <h2>RAG 调用链路动画</h2>
+        <p class="lead">这张图按真实调用时序，逐个点亮每个处理阶段。MCP Client 发起请求后，经过协议层、检索层、融合层、精排层，最后组装响应返回。</p>
+        <div class="diagram-card">
+          <div class="diagram-title">
+            <h3>一次 tools/call 的完整处理时序</h3>
+            <div>
+              <p>动画按 9 个阶段依次推进，展示各模块间的调用关系和并行分支（5a/5b、6a/6b 同时进行）。</p>
+              <button class="pause-btn" id="callFlowPause" aria-label="Pause animation">&#x23F8; 暂停动画</button>
+            </div>
+          </div>
+          <svg class="call-flow-svg" viewBox="0 0 1060 560" role="img" aria-label="RAG 调用链路时序动画">
+            <defs>
+              <marker id="cfArrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+                <path d="M0,0 L10,4 L0,8 Z" fill="#8aa4bd"></path>
+              </marker>
+              <marker id="cfArrowBack" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+                <path d="M0,0 L10,4 L0,8 Z" fill="#6950a1"></path>
+              </marker>
+              <filter id="cfGlow">
+                <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#38bdf8" flood-opacity=".6"></feDropShadow>
+              </filter>
+              <filter id="cfGlowGreen">
+                <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#4ade80" flood-opacity=".6"></feDropShadow>
+              </filter>
+              <style>
+                .cf-box{fill:#fff;stroke:#d9e1ea;stroke-width:1.5;rx:8}
+                .cf-title{font-size:12.5px;font-weight:800;fill:#111827;text-anchor:middle}
+                .cf-sub{font-size:10px;fill:#667085;text-anchor:middle}
+                .cf-path{fill:none;stroke:#8aa4bd;stroke-width:1.8;marker-end:url(#cfArrow)}
+                .cf-path-back{fill:none;stroke:#6950a1;stroke-width:1.8;stroke-dasharray:6 4;marker-end:url(#cfArrowBack)}
+                .cf-dot{fill:#38bdf8}
+                .cf-dot.green{fill:#4ade80}
+                .cf-dot.amber{fill:#f59e0b}
+                .cf-dot.violet{fill:#8b5cf6}
+                .cf-step-num{font-size:11px;font-weight:800;fill:#0277bd;text-anchor:middle}
+                @media(prefers-color-scheme:dark){
+                  .cf-box{fill:#1e293b;stroke:#475569}
+                  .cf-title{fill:#e2e8f0}
+                  .cf-sub{fill:#94a3b8}
+                }
+              </style>
+            </defs>
+
+            <rect x="12" y="8" width="1036" height="544" rx="12" fill="#f8fafc" stroke="#d9e1ea"></rect>
+
+            <!-- 1: MCP Client -->
+            <rect x="430" y="24" width="200" height="46" class="cf-box"></rect>
+            <text x="530" y="44" class="cf-title">MCP Client</text>
+            <text x="530" y="60" class="cf-sub">Copilot / Claude / CLI</text>
+            <circle cx="425" cy="47" r="11" fill="#eef7fc" stroke="#b6e3f7"></circle>
+            <text x="425" y="51" class="cf-step-num">1</text>
+
+            <!-- 2: MCP Server -->
+            <path id="cf-p1" d="M530 70 L530 88" class="cf-path"></path>
+            <rect x="430" y="92" width="200" height="46" class="cf-box"></rect>
+            <text x="530" y="112" class="cf-title">MCP Server</text>
+            <text x="530" y="128" class="cf-sub">tools/call dispatch</text>
+            <circle cx="425" cy="115" r="11" fill="#eef7fc" stroke="#b6e3f7"></circle>
+            <text x="425" y="119" class="cf-step-num">2</text>
+
+            <!-- 3: QueryProcessor -->
+            <path id="cf-p2" d="M530 138 L530 156" class="cf-path"></path>
+            <rect x="430" y="160" width="200" height="46" class="cf-box"></rect>
+            <text x="530" y="180" class="cf-title">QueryProcessor</text>
+            <text x="530" y="196" class="cf-sub">normalize + keywords</text>
+            <circle cx="425" cy="183" r="11" fill="#eef7fc" stroke="#b6e3f7"></circle>
+            <text x="425" y="187" class="cf-step-num">3</text>
+
+            <!-- 4: HybridSearch -->
+            <path id="cf-p3" d="M530 206 L530 224" class="cf-path"></path>
+            <rect x="430" y="228" width="200" height="46" class="cf-box"></rect>
+            <text x="530" y="248" class="cf-title">HybridSearch</text>
+            <text x="530" y="264" class="cf-sub">ThreadPool(max_workers=2)</text>
+            <circle cx="425" cy="251" r="11" fill="#eef7fc" stroke="#b6e3f7"></circle>
+            <text x="425" y="255" class="cf-step-num">4</text>
+
+            <!-- Branch to 5a (Dense, left) -->
+            <path id="cf-p4a" d="M470 274 C420 290 340 300 255 314" class="cf-path"></path>
+            <rect x="140" y="318" width="230" height="46" class="cf-box"></rect>
+            <text x="255" y="338" class="cf-title">DenseRetriever</text>
+            <text x="255" y="354" class="cf-sub">embed_query() → ChromaDB</text>
+            <circle cx="135" cy="341" r="11" fill="#eefaf2" stroke="#bfe7ce"></circle>
+            <text x="135" y="345" class="cf-step-num" style="fill:#16824c">5a</text>
+
+            <!-- Branch to 5b (Sparse, right) -->
+            <path id="cf-p4b" d="M590 274 C640 290 720 300 805 314" class="cf-path"></path>
+            <rect x="690" y="318" width="230" height="46" class="cf-box"></rect>
+            <text x="805" y="338" class="cf-title">SparseRetriever</text>
+            <text x="805" y="354" class="cf-sub">keywords → BM25</text>
+            <circle cx="925" cy="341" r="11" fill="#fff8eb" stroke="#ffd59a"></circle>
+            <text x="925" y="345" class="cf-step-num" style="fill:#b96b00">5b</text>
+
+            <!-- 6a: ChromaDB (left) -->
+            <path id="cf-p5a" d="M255 364 L255 382" class="cf-path"></path>
+            <rect x="140" y="386" width="230" height="44" class="cf-box"></rect>
+            <text x="255" y="406" class="cf-title">VectorStore (ChromaDB)</text>
+            <text x="255" y="422" class="cf-sub">cosine similarity search</text>
+
+            <!-- 6b: BM25 (right) -->
+            <path id="cf-p5b" d="M805 364 L805 382" class="cf-path"></path>
+            <rect x="690" y="386" width="230" height="44" class="cf-box"></rect>
+            <text x="805" y="406" class="cf-title">BM25 Index</text>
+            <text x="805" y="422" class="cf-sub">sparse → get_by_ids(ChromaDB)</text>
+
+            <!-- Converge to 7: Fusion -->
+            <path id="cf-p6a" d="M320 408 C360 408 440 445 485 445" class="cf-path"></path>
+            <path id="cf-p6b" d="M740 408 C700 408 620 445 575 445" class="cf-path"></path>
+            <rect x="430" y="424" width="200" height="46" class="cf-box"></rect>
+            <text x="530" y="442" class="cf-title">Fusion (RRF)</text>
+            <text x="530" y="458" class="cf-sub">1/(k+rank) aggregation</text>
+            <circle cx="425" cy="447" r="11" fill="#f5f1ff" stroke="#d7cbff"></circle>
+            <text x="425" y="451" class="cf-step-num" style="fill:#6950a1">7</text>
+
+            <!-- 8: Reranker -->
+            <path id="cf-p7" d="M530 470 L530 486" class="cf-path"></path>
+            <rect x="430" y="490" width="200" height="44" class="cf-box"></rect>
+            <text x="530" y="510" class="cf-title">Reranker</text>
+            <text x="530" y="526" class="cf-sub">LLM re-rank / fallback</text>
+            <circle cx="425" cy="512" r="11" fill="#fff1f1" stroke="#ffc6c6"></circle>
+            <text x="425" y="516" class="cf-step-num" style="fill:#ba2d2d">8</text>
+
+            <!-- Return path (right side) -->
+            <path id="cf-p8" d="M576 512 C660 510 700 460 700 400 C700 340 660 280 700 220 C740 160 720 100 720 40 C720 20 680 36 660 40" class="cf-path-back"></path>
+
+            <!-- Response label -->
+            <rect x="630" y="22" width="80" height="30" rx="6" fill="#f5f1ff" stroke="#d7cbff"></rect>
+            <text x="670" y="42" class="cf-title" style="fill:#6950a1;font-size:11px">Response</text>
+            <circle cx="670" cy="37" r="11" fill="#f5f1ff" stroke="#d7cbff"></circle>
+            <text x="670" y="41" class="cf-step-num" style="fill:#6950a1">9</text>
+
+            <!-- ====== Animated Dots ====== -->
+            <!-- 1→2: Client → MCP Server -->
+            <circle r="5" class="cf-dot" filter="url(#cfGlow)">
+              <animateMotion dur="0.7s" begin="0s" repeatCount="indefinite" path="M530 70 L530 88"></animateMotion>
+            </circle>
+            <!-- 2→3: MCP Server → QueryProcessor -->
+            <circle r="5" class="cf-dot" filter="url(#cfGlow)">
+              <animateMotion dur="0.7s" begin="0.7s" repeatCount="indefinite" path="M530 138 L530 156"></animateMotion>
+            </circle>
+            <!-- 3→4: QueryProcessor → HybridSearch -->
+            <circle r="5" class="cf-dot" filter="url(#cfGlow)">
+              <animateMotion dur="0.7s" begin="1.4s" repeatCount="indefinite" path="M530 206 L530 224"></animateMotion>
+            </circle>
+            <!-- 4→5a: HybridSearch → DenseRetriever -->
+            <circle r="5" class="cf-dot green" filter="url(#cfGlowGreen)">
+              <animateMotion dur="0.9s" begin="2.1s" repeatCount="indefinite" path="M470 274 C420 290 340 300 255 314"></animateMotion>
+            </circle>
+            <!-- 4→5b: HybridSearch → SparseRetriever -->
+            <circle r="5" class="cf-dot amber" filter="url(#cfGlow)">
+              <animateMotion dur="0.9s" begin="2.1s" repeatCount="indefinite" path="M590 274 C640 290 720 300 805 314"></animateMotion>
+            </circle>
+            <!-- 5a→6a: DenseRetriever → ChromaDB -->
+            <circle r="5" class="cf-dot green" filter="url(#cfGlowGreen)">
+              <animateMotion dur="0.7s" begin="3.0s" repeatCount="indefinite" path="M255 364 L255 382"></animateMotion>
+            </circle>
+            <!-- 5b→6b: SparseRetriever → BM25 -->
+            <circle r="5" class="cf-dot amber" filter="url(#cfGlow)">
+              <animateMotion dur="0.7s" begin="3.0s" repeatCount="indefinite" path="M805 364 L805 382"></animateMotion>
+            </circle>
+            <!-- 6a→7: ChromaDB → Fusion -->
+            <circle r="5" class="cf-dot green" filter="url(#cfGlowGreen)">
+              <animateMotion dur="0.9s" begin="3.7s" repeatCount="indefinite" path="M320 408 C360 408 440 445 485 445"></animateMotion>
+            </circle>
+            <!-- 6b→7: BM25 → Fusion -->
+            <circle r="5" class="cf-dot amber" filter="url(#cfGlow)">
+              <animateMotion dur="0.9s" begin="3.7s" repeatCount="indefinite" path="M740 408 C700 408 620 445 575 445"></animateMotion>
+            </circle>
+            <!-- 7→8: Fusion → Reranker -->
+            <circle r="5" class="cf-dot violet" filter="url(#cfGlow)">
+              <animateMotion dur="0.7s" begin="4.6s" repeatCount="indefinite" path="M530 470 L530 486"></animateMotion>
+            </circle>
+            <!-- 8→9: Reranker → Response (return path) -->
+            <circle r="5" class="cf-dot violet" filter="url(#cfGlow)">
+              <animateMotion dur="2.0s" begin="5.3s" repeatCount="indefinite" path="M576 512 C660 510 700 460 700 400 C700 340 660 280 700 220 C740 160 720 100 720 40 C720 20 680 36 660 40"></animateMotion>
+            </circle>
+          </svg>
+        </div>
+
+        <!-- Step progress indicator -->
+        <div class="step-progress" id="stepProgress">
+          <div class="step-row">
+            <div class="step-item" data-step="1"><span class="step-dot"></span><span>Client 发起请求</span></div>
+            <div class="step-item" data-step="2"><span class="step-dot"></span><span>MCP Server 分发</span></div>
+            <div class="step-item" data-step="3"><span class="step-dot"></span><span>QueryProcessor</span></div>
+            <div class="step-item" data-step="4"><span class="step-dot"></span><span>HybridSearch 并发</span></div>
+            <div class="step-item" data-step="5"><span class="step-dot"></span><span>Dense / Sparse 并行</span></div>
+            <div class="step-item" data-step="6"><span class="step-dot"></span><span>Chroma / BM25 召回</span></div>
+            <div class="step-item" data-step="7"><span class="step-dot"></span><span>RRF 融合</span></div>
+            <div class="step-item" data-step="8"><span class="step-dot"></span><span>Reranker 精排</span></div>
+            <div class="step-item" data-step="9"><span class="step-dot"></span><span>Response 返回</span></div>
+          </div>
+        </div>
+
+        <div class="callout" style="margin-top:16px">
+          <strong>怎么读这张图：</strong>步骤 5a/5b 同时开始，代表 Dense 和 Sparse 两条通路并行检索。6a/6b 也同时执行。注意返回路径（紫色虚线）走右侧，表示响应从 Reranker 封装后通过 MCP 返回客户端。
+        </div>
+      </section>
+
+      <section id="query">
+        <h2>查询链路</h2>
+        <p class="lead">查询链路是这个项目最核心的学习对象。它的关键不是“调用一个向量库”，而是把多种召回方式统一成同一种结果格式，再用排序融合和精排提升质量。</p>
+
+        <div class="flow">
+          <div class="flow-row">
+            <div class="flow-cell flow-name">1. QueryProcessor</div>
+            <div class="flow-cell flow-detail">
+              将原始查询做空白规范化，提取英文/数字/中文 token，过滤英文停用词，并清理 metadata filters。
+              输出 <code>ProcessedQuery(raw_query, normalized_query, keywords, filters)</code>。
+            </div>
+            <div class="flow-cell flow-file"><code>src/core/query_engine/query_processor.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">2. HybridSearch</div>
+            <div class="flow-cell flow-detail">
+              用 <code>ThreadPoolExecutor(max_workers=2)</code> 并行启动 Dense 与 Sparse。实际召回量使用
+              <code>recall_k = max(top_k * 2, top_k)</code>，给后续融合留余量。
+            </div>
+            <div class="flow-cell flow-file"><code>src/core/query_engine/hybrid_search.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">3a. DenseRetriever</div>
+            <div class="flow-cell flow-detail">
+              用配置中的 Embedding Provider 把 query 编成向量，再查 VectorStore。返回统一的 <code>RetrievalResult</code>。
+            </div>
+            <div class="flow-cell flow-file"><code>src/core/query_engine/dense_retriever.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">3b. SparseRetriever</div>
+            <div class="flow-cell flow-detail">
+              查询 BM25 索引拿到 chunk_id，再从 VectorStore 批量取 text 和 metadata，保证 Sparse 结果也能进入统一排序链路。
+            </div>
+            <div class="flow-cell flow-file"><code>src/core/query_engine/sparse_retriever.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">4. Fusion</div>
+            <div class="flow-cell flow-detail">
+              对 Dense 和 Sparse 排名做 RRF：同一个 chunk 在两路都靠前时，分数会累加。排序 tie-breaker 使用 chunk_id，结果稳定可测。
+            </div>
+            <div class="flow-cell flow-file"><code>src/core/query_engine/fusion.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">5. Reranker</div>
+            <div class="flow-cell flow-detail">
+              默认按配置构建 LLM Reranker。失败时回退到候选原始顺序，并在 metadata 标记 fallback，避免整条查询链路崩掉。
+            </div>
+            <div class="flow-cell flow-file"><code>src/core/query_engine/reranker.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">6. ResponseBuilder</div>
+            <div class="flow-cell flow-detail">
+              生成 MCP content：文本 Markdown、citations 结构化字段，以及从 image_refs 拼装出的图片内容。
+            </div>
+            <div class="flow-cell flow-file"><code>src/core/response/response_builder.py</code></div>
+          </div>
+        </div>
+
+        <h3>查询链路伪代码</h3>
+        <div class="panel tight">
+          <button class="copy-btn" data-copy="query-code">复制</button>
+          <pre id="query-code"><code><span class="kw">def</span> <span class="fn">query_knowledge_hub</span>(query, top_k=5):
+    settings = load_settings()
+    processed = QueryProcessor().process(query)
+
+    recall_k = max(top_k * 2, top_k)
+    dense_results  = DenseRetriever(settings).retrieve(processed.normalized_query, recall_k)
+    sparse_results = SparseRetriever(settings).retrieve(processed.keywords, recall_k)
+
+    candidates = Fusion(settings).fuse(dense_results, sparse_results, top_k=recall_k)
+    ranked = Reranker(settings).rerank(query, candidates, top_k=min(top_k, settings.rerank.top_k))
+
+    return ResponseBuilder().build(ranked, query)</code></pre>
+        </div>
+
+        <details>
+          <summary>为什么 Dense 和 Sparse 都要保留</summary>
+          <div class="detail-body">
+            <p>Dense 适合同义表达、语义相近的问题，比如“如何接入客户端”可以命中“Claude Desktop 配置”。Sparse 适合专有名词、函数名、配置键，比如 <code>rrf_k</code>、<code>query_knowledge_hub</code>、<code>TraceContext</code>。混合检索的收益来自互补，而不是简单叠加。</p>
+          </div>
+        </details>
+        <details>
+          <summary>RRF 的实现细节</summary>
+          <div class="detail-body">
+            <p>RRF 不直接比较 Dense score 和 BM25 score，因为两者量纲不同。它只关心排名：<code>1 / (rrf_k + rank)</code>。如果同一个 chunk 同时在 Dense 第 3 名、Sparse 第 2 名，它会得到两份分数。</p>
+            <pre><code>aggregate_scores[chunk_id] += 1.0 / (self._rrf_k + rank)
+ranked_ids = sorted(aggregate_scores, key=lambda id: (-aggregate_scores[id], id))</code></pre>
+          </div>
+        </details>
+      </section>
+
+      <section id="rag-full">
+        <h2>RAG 检索整体实现全流程</h2>
+        <p class="lead">下面这节按真实调用顺序写。你可以把它当成源码阅读路线：每读完一步，就去右侧源码文件里看对应函数。</p>
+        <div class="phase-grid">
+          <div class="phase">
+            <b>阶段 0：MCP Tool 入口</b>
+            <span><code>query_knowledge_hub(arguments)</code> 读取 query 和 top_k，top_k 最大限制为 20，然后加载配置并组装各个组件。</span>
+          </div>
+          <div class="phase">
+            <b>阶段 1：查询预处理</b>
+            <span>QueryProcessor 负责把用户问题变成两类输入：Dense 用 normalized_query，Sparse 用 keywords。</span>
+          </div>
+          <div class="phase">
+            <b>阶段 2：双路粗召回</b>
+            <span>HybridSearch 用线程池并行跑 DenseRetriever 和 SparseRetriever，把两路结果统一成 RetrievalResult。</span>
+          </div>
+          <div class="phase">
+            <b>阶段 3：RRF 融合</b>
+            <span>Fusion 不比较原始分数，只比较排名，用 <code>1/(rrf_k+rank)</code> 把两路候选合并。</span>
+          </div>
+          <div class="phase">
+            <b>阶段 4：Rerank 精排</b>
+            <span>Reranker 默认使用 LLM 后端；失败时返回融合排序前几名，并标记 fallback。</span>
+          </div>
+          <div class="phase">
+            <b>阶段 5：响应构建</b>
+            <span>ResponseBuilder 输出 MCP content 和 structuredContent，包含 markdown、citation 和可选图片内容。</span>
+          </div>
+        </div>
+
+        <h3>逐步展开</h3>
+        <div class="flow">
+          <div class="flow-row">
+            <div class="flow-cell flow-name">0. Tool 参数</div>
+            <div class="flow-cell flow-detail">
+              输入来自 MCP <code>tools/call</code>：<code>{"query": "...", "top_k": 5}</code>。
+              代码会校验 query 非空，校验 top_k 为正数，并执行 <code>top_k = min(top_k, 20)</code>。
+            </div>
+            <div class="flow-cell flow-file"><code>src/mcp_server/tools/query_knowledge_hub.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">1. 组件装配</div>
+            <div class="flow-cell flow-detail">
+              每次调用都会 <code>load_settings()</code>，然后创建 QueryProcessor、DenseRetriever、SparseRetriever、Fusion、HybridSearch、Reranker。
+              Retriever 与 Reranker 内部再通过 Factory 创建具体 Provider。
+            </div>
+            <div class="flow-cell flow-file"><code>src/core/settings.py</code><br><code>src/libs/*/*_factory.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">2. QueryProcessor</div>
+            <div class="flow-cell flow-detail">
+              <code>_normalize_query()</code> 把连续空白折叠成一个空格；<code>_extract_keywords()</code> 用正则提取英文、数字、下划线和中文块；
+              <code>_normalize_filters()</code> 清除空 key、None、空字符串。
+            </div>
+            <div class="flow-cell flow-file"><code>src/core/query_engine/query_processor.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">3. Dense 召回</div>
+            <div class="flow-cell flow-detail">
+              DenseRetriever 调用 <code>embedding_client.embed_query(query)</code> 得到 query_vector，再调用
+              <code>vector_store.query(vector, top_k, filters)</code>。返回结果会被包装成统一的 <code>RetrievalResult</code>。
+            </div>
+            <div class="flow-cell flow-file"><code>src/core/query_engine/dense_retriever.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">4. Sparse 召回</div>
+            <div class="flow-cell flow-detail">
+              SparseRetriever 用 keywords 查询 BM25，拿到 chunk_id 和 BM25 score；再通过
+              <code>vector_store.get_by_ids(ids)</code> 补齐 text 与 metadata，所以后面可以和 Dense 共用排序逻辑。
+            </div>
+            <div class="flow-cell flow-file"><code>src/core/query_engine/sparse_retriever.py</code><br><code>src/ingestion/storage/bm25_indexer.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">5. 故障降级</div>
+            <div class="flow-cell flow-detail">
+              HybridSearch 会分别捕获 Dense 和 Sparse 异常：只要其中一路成功，就继续走；两路都失败才抛错。
+              这就是检索层的 graceful degradation。
+            </div>
+            <div class="flow-cell flow-file"><code>src/core/query_engine/hybrid_search.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">6. RRF 融合</div>
+            <div class="flow-cell flow-detail">
+              Fusion 按排名遍历两路结果，用 chunk_id 聚合分数；同 id 的候选保留第一份 payload，但分数累加。
+              排序键是 <code>(-score, chunk_id)</code>，所以测试结果稳定。
+            </div>
+            <div class="flow-cell flow-file"><code>src/core/query_engine/fusion.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">7. metadata filter</div>
+            <div class="flow-cell flow-detail">
+              融合后再执行 metadata filter。普通值用相等比较，列表值支持交集匹配。最后返回 <code>filtered[:top_k]</code>。
+            </div>
+            <div class="flow-cell flow-file"><code>HybridSearch._apply_metadata_filters()</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">8. Reranker</div>
+            <div class="flow-cell flow-detail">
+              候选被转换成 <code>{id, score, text, metadata}</code> payload。LLM Reranker 读取 <code>config/prompts/rerank.txt</code>，
+              要求模型返回 <code>{"ranked_ids": [...]}</code>；如果失败，返回候选原顺序的前 k 个。
+            </div>
+            <div class="flow-cell flow-file"><code>src/core/query_engine/reranker.py</code><br><code>src/libs/reranker/llm_reranker.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">9. Response</div>
+            <div class="flow-cell flow-detail">
+              CitationGenerator 从 metadata 里提取 source、page、chunk_id；MultimodalAssembler 读取 image_refs 对应图片；
+              ResponseBuilder 组合成 MCP 要求的 <code>content</code> 和 <code>structuredContent</code>。
+            </div>
+            <div class="flow-cell flow-file"><code>src/core/response/</code></div>
+          </div>
+        </div>
+
+        <h3>关键实现细节</h3>
+        <div class="mini-steps">
+          <div class="mini-step"><b>为什么先粗召回再精排</b><span>Embedding、BM25 成本低，适合扩大候选池；LLM Rerank 成本高，适合只处理少量候选。</span></div>
+          <div class="mini-step"><b>为什么 Sparse 要回查 Chroma</b><span>BM25 只负责倒排命中和打分，完整文本、metadata 仍由 VectorStore 统一提供。</span></div>
+          <div class="mini-step"><b>为什么 RRF 不用原始 score</b><span>Dense 相似度和 BM25 分数不可直接比较，排名融合更稳。</span></div>
+          <div class="mini-step"><b>为什么要稳定 chunk_id</b><span>Dense、Sparse、引用、图片、多轮摄取都靠同一个 chunk_id 对齐。</span></div>
+          <div class="mini-step"><b>为什么要 trace</b><span>检索质量差时，trace 能看出是关键词、向量库、BM25、RRF 还是 Rerank 的问题。</span></div>
+          <div class="mini-step"><b>为什么 MCP 层要薄</b><span>MCP 只做协议适配，核心逻辑留在 core/libs，方便 CLI、Dashboard、测试复用。</span></div>
+        </div>
+      </section>
+
+      <section id="ingestion">
+        <h2>数据摄取</h2>
+        <p class="lead">摄取链路决定“能不能搜到”。查询再聪明，如果 Chunk 质量、metadata、索引一致性做不好，召回和引用都会不稳定。</p>
+        <div class="flow">
+          <div class="flow-row">
+            <div class="flow-cell flow-name">1. Integrity</div>
+            <div class="flow-cell flow-detail">计算文件 SHA256，SQLite 记录成功/失败状态；未变化时可跳过重复摄取。</div>
+            <div class="flow-cell flow-file"><code>libs/loader/file_integrity.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">2. Load</div>
+            <div class="flow-cell flow-detail">PDF Loader 读取文本、图片信息、页码和 source_path，形成 <code>Document</code>。</div>
+            <div class="flow-cell flow-file"><code>src/libs/loader/pdf_loader.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">3. Split</div>
+            <div class="flow-cell flow-detail">按配置的 splitter、chunk_size、chunk_overlap 切分，并生成稳定 chunk_id。</div>
+            <div class="flow-cell flow-file"><code>src/ingestion/chunking/document_chunker.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">4. Transform</div>
+            <div class="flow-cell flow-detail">依次执行 ChunkRefiner、MetadataEnricher、ImageCaptioner。可以用规则或 LLM 增强文本与 metadata。</div>
+            <div class="flow-cell flow-file"><code>src/ingestion/transform/</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">5. Encode</div>
+            <div class="flow-cell flow-detail">BatchProcessor 分批运行 DenseEncoder 和 SparseEncoder，再合并成同 id 的 <code>ChunkRecord</code>。</div>
+            <div class="flow-cell flow-file"><code>src/ingestion/embedding/batch_processor.py</code></div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-cell flow-name">6. Store</div>
+            <div class="flow-cell flow-detail">先 VectorUpserter 写 Chroma，拿到稳定 ids 后再构建 BM25，保证两套索引用同一 chunk_id 空间。</div>
+            <div class="flow-cell flow-file"><code>src/ingestion/storage/</code></div>
+          </div>
+        </div>
+        <div class="callout">
+          <strong>关键工程点：</strong><code>IngestionPipeline._stage_store()</code> 先 upsert 向量库，再把返回的稳定记录交给 BM25。这样 Sparse 命中的 chunk_id 才能回查到同一个 Chroma 记录。
+        </div>
+      </section>
+
+      <section id="mcp">
+        <h2>MCP 服务</h2>
+        <div class="grid">
+          <div class="panel">
+            <h3>协议处理流程</h3>
+            <ol>
+              <li><code>server.py</code> 从 stdin 逐行读取 JSON-RPC 请求，stdout 只输出 JSON 响应，日志走 stderr。</li>
+              <li><code>ProtocolHandler.dispatch()</code> 根据 method 分发到 initialize、tools/list、tools/call。</li>
+              <li><code>tools/__init__.py</code> 注册三个 ToolSpec，并把 handler 绑定到具体 Python 函数。</li>
+              <li><code>query_knowledge_hub</code> 组装完整 RAG 链路并返回 MCP content。</li>
+            </ol>
+          </div>
+          <div class="panel">
+            <h3>已暴露工具</h3>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Tool</th><th>用途</th></tr></thead>
+                <tbody>
+                  <tr><td><code>query_knowledge_hub</code></td><td>混合检索知识库并返回带引用的结果。</td></tr>
+                  <tr><td><code>list_collections</code></td><td>查看当前向量库集合。</td></tr>
+                  <tr><td><code>get_document_summary</code></td><td>按 doc_id / chunk_id 查看文档摘要、标题和标签。</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <h3>一次 tools/call 的形状</h3>
+        <div class="panel tight">
+          <pre><code>{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/call",
+  "params": {
+    "name": "query_knowledge_hub",
+    "arguments": { "query": "RRF 是怎么融合排序的？", "top_k": 5 }
+  }
+}</code></pre>
+        </div>
+      </section>
+
+      <section id="config">
+        <h2>配置入口</h2>
+        <p class="lead"><code>config/settings.yaml</code> 是理解可插拔架构的入口。绝大多数替换都应该先从这里开始，而不是直接改业务代码。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>配置块</th><th>当前职责</th><th>影响的源码</th></tr></thead>
+            <tbody>
+              <tr><td><code>llm</code></td><td>生成模型，也是 LLM Reranker 的后端来源。</td><td><code>libs/llm/*</code>、<code>core/query_engine/reranker.py</code></td></tr>
+              <tr><td><code>embedding</code></td><td>查询向量和文档向量的模型、维度、API 地址。</td><td><code>libs/embedding/*</code>、<code>dense_retriever.py</code></td></tr>
+              <tr><td><code>vector_store</code></td><td>Chroma 持久化目录和 collection 名称。</td><td><code>libs/vector_store/*</code></td></tr>
+              <tr><td><code>retrieval</code></td><td>Dense/Sparse/Fusion Top-K 与 RRF k。</td><td><code>hybrid_search.py</code>、<code>fusion.py</code></td></tr>
+              <tr><td><code>rerank</code></td><td>是否启用精排、使用 llm/cross_encoder/none、最终 top_k。</td><td><code>core/query_engine/reranker.py</code>、<code>libs/reranker/*</code></td></tr>
+              <tr><td><code>ingestion</code></td><td>chunk_size、overlap、batch_size、transform 开关。</td><td><code>src/ingestion/*</code></td></tr>
+              <tr><td><code>observability</code></td><td>日志级别、trace 文件和结构化日志。</td><td><code>src/observability/*</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="warn callout">
+          <strong>配置一致性：</strong>Embedding 维度必须和已入库向量一致。改 <code>embedding.dimensions</code> 或模型后，通常需要重新摄取数据。
+        </div>
+      </section>
+
+      <section id="observability">
+        <h2>可观测性</h2>
+        <div class="grid three">
+          <div class="panel">
+            <h3>TraceContext</h3>
+            <p>每个阶段通过 <code>record_stage(name, **details)</code> 追加耗时、参数、错误标记。</p>
+            <div class="tagrow"><span class="tag cyan">ingestion</span><span class="tag cyan">query</span></div>
+          </div>
+          <div class="panel">
+            <h3>JSONL Trace</h3>
+            <p><code>write_trace()</code> 以一行一个 JSON 的方式写入日志文件，适合后续 Dashboard 或脚本分析。</p>
+            <div class="tagrow"><span class="tag green">logs/traces.jsonl</span></div>
+          </div>
+          <div class="panel">
+            <h3>Dashboard</h3>
+            <p>Streamlit 页面读取数据、配置和 trace，帮助定位摄取失败、检索慢、召回差等问题。</p>
+            <div class="tagrow"><span class="tag amber">src/observability/dashboard</span></div>
+          </div>
+        </div>
+        <h3>查询 trace 里最该看的字段</h3>
+        <div class="checklist">
+          <div class="check"><b><code>query_processing.keywords</code></b><span>关键词抽取是否符合预期，Sparse 检索是否有输入。</span></div>
+          <div class="check"><b><code>dense_retrieval.result_count</code></b><span>向量库是否真的返回结果，Embedding/Chroma 是否正常。</span></div>
+          <div class="check"><b><code>sparse_retrieval.error</code></b><span>BM25 索引是否加载失败，或者没有对应 chunk_id。</span></div>
+          <div class="check"><b><code>rerank.fallback</code></b><span>LLM Reranker 是否失败，是否退回到了融合原始顺序。</span></div>
+        </div>
+      </section>
+
+      <section id="extension">
+        <h2>扩展点</h2>
+        <p class="lead">这个项目的扩展姿势，是“新增实现 + 工厂注册 + 配置切换”。这样做可以把业务逻辑留在 core，把供应商差异放在 libs。</p>
+        <div class="grid">
+          <div class="panel">
+            <h3>新增 Embedding Provider</h3>
+            <ol>
+              <li>在 <code>src/libs/embedding/</code> 新增实现，遵守 BaseEmbedding 接口。</li>
+              <li>在 <code>embedding_factory.py</code> 注册 provider 名称。</li>
+              <li>在 <code>settings.yaml</code> 切换 <code>embedding.provider</code>、<code>model</code>、<code>dimensions</code>。</li>
+              <li>重新摄取数据，保证向量维度一致。</li>
+            </ol>
+          </div>
+          <div class="panel">
+            <h3>新增 MCP Tool</h3>
+            <ol>
+              <li>在 <code>src/mcp_server/tools/</code> 新增 handler，输入输出都是 dict。</li>
+              <li>在 <code>tools/__init__.py</code> 添加 <code>ToolSpec</code> 和 inputSchema。</li>
+              <li>用 <code>scripts/test_mcp_list.py</code> 或集成测试验证 tools/list 与 tools/call。</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section id="debug">
+        <h2>调试清单</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>现象</th><th>优先检查</th><th>常见原因</th></tr></thead>
+            <tbody>
+              <tr><td>查询总是没有结果</td><td><code>data/db/chroma</code>、<code>data/db/bm25</code>、摄取 trace</td><td>还没摄取数据；collection 名不一致；BM25 未构建。</td></tr>
+              <tr><td>Dense 有结果但 Sparse 没结果</td><td><code>QueryProcessor.keywords</code>、BM25 索引文件</td><td>关键词抽取过少；索引没有持久化；chunk_id 回查失败。</td></tr>
+              <tr><td>Rerank 很慢或失败</td><td><code>rerank.provider</code>、LLM API Key、trace fallback</td><td>LLM 后端超时；模型不可用；候选文本过长。</td></tr>
+              <tr><td>MCP 客户端连不上</td><td>stdio 是否只输出 JSON、<code>PYTHONPATH</code>、工作目录</td><td>stdout 混入日志；cwd 不对；模块路径找不到。</td></tr>
+              <tr><td>中文查询乱码</td><td><code>server.py</code> UTF-8 stdin/stdout 包装</td><td>Windows 默认编码不是 UTF-8；客户端未按 UTF-8 发送。</td></tr>
+              <tr><td>引用来源不对</td><td>Chunk metadata 的 <code>source_path</code>、<code>page</code></td><td>Loader 没写 metadata；Transform 覆盖字段。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="files">
+        <h2>源码地图</h2>
+        <div class="source-map">
+          <div><b>入口脚本</b><span><code>main.py</code><br><code>start_mcp_server.py</code><br><code>scripts/*.py</code></span></div>
+          <div><b>配置与类型</b><span><code>src/core/settings.py</code><br><code>src/core/types.py</code></span></div>
+          <div><b>查询核心</b><span><code>src/core/query_engine/query_processor.py</code><br><code>src/core/query_engine/hybrid_search.py</code><br><code>src/core/query_engine/fusion.py</code><br><code>src/core/query_engine/reranker.py</code></span></div>
+          <div><b>响应构建</b><span><code>src/core/response/response_builder.py</code><br><code>src/core/response/citation_generator.py</code><br><code>src/core/response/multimodal_assembler.py</code></span></div>
+          <div><b>摄取主链路</b><span><code>src/ingestion/pipeline.py</code><br><code>src/ingestion/chunking/document_chunker.py</code><br><code>src/ingestion/embedding/batch_processor.py</code></span></div>
+          <div><b>存储与索引</b><span><code>src/ingestion/storage/vector_upserter.py</code><br><code>src/ingestion/storage/bm25_indexer.py</code><br><code>src/libs/vector_store/chroma_store.py</code></span></div>
+          <div><b>MCP</b><span><code>src/mcp_server/server.py</code><br><code>src/mcp_server/protocol_handler.py</code><br><code>src/mcp_server/tools/</code></span></div>
+          <div><b>观测与测试</b><span><code>src/observability/</code><br><code>tests/unit/</code><br><code>tests/integration/</code><br><code>tests/e2e/</code></span></div>
+        </div>
+      </section>
+    </div>
+    <button class="back-to-top" id="backToTop" aria-label="Back to top">&#8593;</button>
+  </main>
+</div>
+
+<script>
+const navLinks = [...document.querySelectorAll(".nav a")];
+const sections = navLinks
+  .map(link => document.querySelector(link.getAttribute("href")))
+  .filter(Boolean);
+
+// Active nav tracking with aria-current
+const observer = new IntersectionObserver(entries => {
+  const visible = entries
+    .filter(entry => entry.isIntersecting)
+    .sort((a,b) => b.intersectionRatio - a.intersectionRatio)[0];
+  if (!visible) return;
+  navLinks.forEach(link => {
+    const match = link.getAttribute("href") === `#${visible.target.id}`;
+    link.classList.toggle("active", match);
+    if (match) link.setAttribute("aria-current", "page");
+    else link.removeAttribute("aria-current");
+  });
+}, {rootMargin:"-10% 0px -50% 0px", threshold:[0.1,0.25,0.5]});
+sections.forEach(section => observer.observe(section));
+
+// Copy with fallback for non-HTTPS
+document.querySelectorAll("[data-copy]").forEach(button => {
+  button.addEventListener("click", async () => {
+    const target = document.getElementById(button.dataset.copy);
+    if (!target) return;
+    const text = target.innerText;
+    const done = (msg) => { button.textContent = msg; setTimeout(() => button.textContent = "复制", 1200); };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.select();
+        document.execCommand("copy"); ta.remove();
+      }
+      done("已复制");
+    } catch {
+      done("复制失败");
+    }
+  });
+});
+
+// Mobile sidebar toggle
+const sidebar = document.querySelector(".sidebar");
+const toggleBtn = document.getElementById("sidebarToggle");
+if (toggleBtn && sidebar) {
+  toggleBtn.addEventListener("click", () => {
+    sidebar.classList.toggle("collapsed");
+    toggleBtn.innerHTML = sidebar.classList.contains("collapsed") ? "&#9776;" : "&#10005;";
+  });
+  navLinks.forEach(link => {
+    link.addEventListener("click", () => {
+      if (window.innerWidth <= 980) {
+        sidebar.classList.add("collapsed");
+        toggleBtn.innerHTML = "&#9776;";
+      }
+    });
+  });
+}
+
+// Back to top
+const backBtn = document.getElementById("backToTop");
+if (backBtn) {
+  window.addEventListener("scroll", () => {
+    backBtn.classList.toggle("visible", window.scrollY > 500);
+  });
+  backBtn.addEventListener("click", () => window.scrollTo({top:0,behavior:"smooth"}));
+}
+
+// SVG animation pause
+const pauseBtn2 = document.getElementById("callFlowPause");
+if (pauseBtn2) {
+  const svgs2 = document.querySelectorAll(".call-flow-svg");
+  pauseBtn2.addEventListener("click", () => {
+    const paused = pauseBtn2.classList.toggle("paused");
+    svgs2.forEach(s => s.classList.toggle("paused", paused));
+    pauseBtn2.innerHTML = paused ? "&#x25B6; 播放动画" : "&#x23F8; 暂停动画";
+  });
+}
+
+// Step progress sync (highlight steps in time with animation cycle ~7.3s)
+const stepItems = document.querySelectorAll(".step-item");
+if (stepItems.length) {
+  const CYCLE = 7.3; // total animation cycle in seconds
+  const offsets = [0.35, 1.05, 1.75, 2.55, 3.45, 4.35, 5.15, 5.85, 6.65]; // center times per step
+  const cfSvg = document.querySelector(".call-flow-svg");
+  let stepTimer = null;
+
+  function highlightStep(idx) {
+    stepItems.forEach((el, i) => {
+      el.classList.remove("active", "done");
+      if (i < idx) el.classList.add("done");
+      if (i === idx) el.classList.add("active");
+    });
+  }
+
+  function syncSteps() {
+    if (!cfSvg || cfSvg.classList.contains("paused")) return;
+    const t = (performance.now() / 1000) % CYCLE;
+    let current = 0;
+    for (let i = offsets.length - 1; i >= 0; i--) {
+      if (t >= offsets[i]) { current = i; break; }
+    }
+    highlightStep(current);
+  }
+
+  stepTimer = setInterval(syncSteps, 150);
+  syncSteps();
+}
+
+const pauseBtn = document.getElementById("pauseBtn");
+if (pauseBtn) {
+  const svgs = document.querySelectorAll(".data-svg");
+  pauseBtn.addEventListener("click", () => {
+    const paused = pauseBtn.classList.toggle("paused");
+    svgs.forEach(s => s.classList.toggle("paused", paused));
+    pauseBtn.innerHTML = paused ? "&#x25B6; 播放动画" : "&#x23F8; 暂停动画";
+  });
+}
+</script>
+</body>
+</html>

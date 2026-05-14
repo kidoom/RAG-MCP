@@ -1,3 +1,4 @@
+
 """MCP server entrypoint using stdio transport.
 
 E1 scope:
