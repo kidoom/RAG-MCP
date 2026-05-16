@@ -9,6 +9,7 @@
 - [项目概述](#-项目概述)
 - [分支说明](#-分支说明)
 - [快速开始](#-快速开始)
+  - [项目架构可视化](#7-项目架构可视化)
 ---
 
 ## 🏗️ 项目概述
@@ -244,7 +245,43 @@ PYTHONPATH=src streamlit run src/observability/dashboard/app.py
 | **Query Traces** | 查询历史列表（支持关键词搜索），Dense vs Sparse 结果数对比，Rerank 前后排名变化分析 |
 | **Evaluation** | 选择评估后端（Custom / Ragas）与 Golden Test Set，运行评估并展示 Hit Rate / MRR 等指标，支持历史报告查看 |
 
-### 6. 运行测试
+### 6. 项目架构可视化
+
+项目内置一个交互式代码可视化工具，基于 **Cytoscape.js** + **Mermaid**，可在浏览器中直观查看模块间的依赖关系与数据流。
+
+#### 快速启动
+
+```bash
+cd code-viz
+npm install    # 首次使用需要安装依赖
+npm start      # 启动可视化服务（默认 http://localhost:3456）
+```
+
+> 需要 **Node.js 18+**。首次启动时 `prestart` 脚本会自动同步前端库文件。
+
+#### 使用方式
+
+1. 启动后在浏览器打开 `http://localhost:3456`
+2. 可视化面板会展示项目全部模块的依赖拓扑图（core / libs / ingestion / mcp_server 等）
+3. 支持节点点击、缩放、搜索高亮，可实时查看各模块间的调用关系
+4. 修改源码后页面会通过 SSE 热刷新，无需手动刷新浏览器
+
+#### 生成静态报告
+
+```bash
+cd code-viz
+python parser/extract.py    # 解析源码，生成 public/metadata.json
+```
+
+生成的 `metadata.json` 是所有模块关系的数据源，供前端渲染使用。
+
+#### 跨项目复用
+
+该工具是独立的 Node.js 项目，可直接复制 `code-viz/` 目录到其他 Python 项目使用，只需修改 `server.js` 中的 `ROOT` 路径指向新的项目根目录即可。
+
+---
+
+### 7. 运行测试
 
 ```bash
 # 单元测试（281 个）
